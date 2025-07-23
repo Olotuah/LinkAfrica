@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1753270548324,
+    "event": "link_click",
+    "data": {
+      "linkId": 1753270536546,
+      "linkTitle": "Instagram",
+      "linkUrl": "gccxg",
+      "userId": 1753269641154
+    },
+    "timestamp": "2025-07-23T11:35:48.324Z",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    "ip": "::1"
+  }
+]

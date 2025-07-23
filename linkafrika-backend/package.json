@@ -1,0 +1,50 @@
+{
+  "name": "linkafrika-backend",
+  "version": "1.0.0",
+  "description": "LinkAfrika Backend API - Link-in-bio platform for African creators",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "linkafrika",
+    "link-in-bio",
+    "africa",
+    "creators",
+    "api",
+    "express",
+    "nodejs"
+  ],
+  "author": "LinkAfrika Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1",
+    "express-validator": "^7.0.1",
+    "compression": "^1.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/linkafrika-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/linkafrika-backend/issues"
+  },
+  "homepage": "https://linkafrika.com"
+}
