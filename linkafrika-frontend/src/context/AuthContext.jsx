@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
+  // Also fix your checkAuthStatus error handling:
   const checkAuthStatus = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -42,7 +43,8 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error("Error checking auth status:", error);
-      clearAllData();
+      // FIXED: Only clear session data, not user accounts
+      logout(); // This now calls the fixed logout function
     } finally {
       setLoading(false);
     }
@@ -247,9 +249,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Replace your logout function with this:
   const logout = () => {
     console.log("👋 Logging out user...");
-    clearAllData();
+
+    // Only clear session data, NOT user accounts
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("links");
+    localStorage.removeItem("analytics");
+
+    // Clear product-specific data
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach((key) => {
+      if (key.startsWith("products_")) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    // Reset auth state
+    setUser(null);
+    setIsAuthenticated(false);
+
+    console.log("✅ Session cleared successfully");
+    // NOTE: Users array is preserved for future logins
   };
 
   const refreshUser = async () => {
