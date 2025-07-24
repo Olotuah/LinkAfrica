@@ -45,28 +45,27 @@ const Pricing = () => {
         "Standard support",
       ],
     },
-    // In Pricing.jsx, update the pro plan features:
-pro: {
-  name: "Pro Creator",
-  price: 3000,
-  yearlyPrice: 30000,
-  icon: <Crown className="w-8 h-8" />,
-  color: "from-orange-500 to-green-500",
-  popular: true,
-  features: [
-    "Unlimited links",
-    "Sell digital products", // ✅ This works
-    "Advanced analytics", // ✅ This works
-    "Custom themes", // ✅ This works
-    "Remove LinkAfrika branding",
-    "Priority support",
-    "Custom domain (Coming Q2 2025)", // ❌ This doesn't work yet
-    "Email marketing integration (Coming Q2 2025)", // ❌ This doesn't work yet
-    "Social media scheduler (Coming Q2 2025)", // ❌ This doesn't work yet
-    "QR code generator", // ✅ Can implement this
-  ],
-  limitations: [],
-},
+    pro: {
+      name: "Pro Creator",
+      price: 3000,
+      yearlyPrice: 30000,
+      icon: <Crown className="w-8 h-8" />,
+      color: "from-orange-500 to-green-500",
+      popular: true,
+      features: [
+        "Unlimited links",
+        "Sell digital products",
+        "Advanced analytics",
+        "Custom themes",
+        "Remove LinkAfrika branding",
+        "Priority support",
+        "QR code generator",
+        "Custom domain (Coming Q2 2025)",
+        "Email marketing integration (Coming Q2 2025)",
+        "Social media scheduler (Coming Q2 2025)",
+      ],
+      limitations: [],
+    },
     business: {
       name: "Business Team",
       price: 10000,
@@ -158,30 +157,32 @@ pro: {
         </div>
         <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
         <div className="mb-4">
-  {billingCycle === "monthly" ? (
-    <>
-      <span className="text-4xl font-bold text-gray-900">
-        ₦{plan.price.toLocaleString()}
-      </span>
-      <span className="text-gray-500 ml-2">/month</span>
-    </>
-  ) : (
-    <>
-      <span className="text-4xl font-bold text-gray-900">
-        ₦{plan.yearlyPrice.toLocaleString()}
-      </span>
-      <span className="text-gray-500 ml-2">/year</span>
-      <div className="text-lg text-gray-600 mt-1">
-        (₦{Math.floor(plan.yearlyPrice / 12).toLocaleString()}/month)
+          {billingCycle === "monthly" ? (
+            <>
+              <span className="text-4xl font-bold text-gray-900">
+                ₦{plan.price.toLocaleString()}
+              </span>
+              <span className="text-gray-500 ml-2">/month</span>
+            </>
+          ) : (
+            <>
+              <span className="text-4xl font-bold text-gray-900">
+                ₦{plan.yearlyPrice.toLocaleString()}
+              </span>
+              <span className="text-gray-500 ml-2">/year</span>
+              <div className="text-lg text-gray-600 mt-1">
+                (₦{Math.floor(plan.yearlyPrice / 12).toLocaleString()}/month)
+              </div>
+            </>
+          )}
+        </div>
+        {billingCycle === "yearly" && plan.price > 0 && (
+          <div className="text-sm text-green-600 font-medium">
+            Save ₦{(plan.price * 12 - plan.yearlyPrice).toLocaleString()}{" "}
+            yearly!
+          </div>
+        )}
       </div>
-    </>
-  )}
-</div>
-{billingCycle === "yearly" && plan.price > 0 && (
-  <div className="text-sm text-green-600 font-medium">
-    Save ₦{(plan.price * 12 - plan.yearlyPrice).toLocaleString()} yearly!
-  </div>
-)}
 
       <div className="space-y-4 mb-8">
         <h4 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">
@@ -330,10 +331,10 @@ pro: {
                     <X className="w-5 h-5 text-red-400 mx-auto" />
                   </td>
                   <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
+                    <span className="text-gray-400">Coming Q2</span>
                   </td>
                   <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
+                    <span className="text-gray-400">Coming Q2</span>
                   </td>
                 </tr>
                 <tr>
@@ -353,6 +354,18 @@ pro: {
                 <tr>
                   <td className="py-4 px-6 font-medium">Advanced Analytics</td>
                   <td className="py-4 px-6 text-center">Basic</td>
+                  <td className="py-4 px-6 text-center">
+                    <Check className="w-5 h-5 text-green-500 mx-auto" />
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <Check className="w-5 h-5 text-green-500 mx-auto" />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-4 px-6 font-medium">QR Code Generator</td>
+                  <td className="py-4 px-6 text-center">
+                    <X className="w-5 h-5 text-red-400 mx-auto" />
+                  </td>
                   <td className="py-4 px-6 text-center">
                     <Check className="w-5 h-5 text-green-500 mx-auto" />
                   </td>
@@ -461,8 +474,7 @@ pro: {
                 Can I use my own domain?
               </h3>
               <p className="text-gray-600 text-sm">
-                Custom domains are available on Pro and Business plans. We'll
-                help you set it up.
+                Custom domains are coming in Q2 2025 for Pro and Business plans.
               </p>
             </div>
           </div>
@@ -491,11 +503,9 @@ pro: {
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Users className="w-6 h-6 text-blue-600" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                10,000+ Users
-              </h3>
+              <h3 className="font-semibold text-gray-900 mb-2">1,000+ Users</h3>
               <p className="text-gray-600 text-sm">
-                Join thousands of Nigerian creators
+                Join growing community of Nigerian creators
               </p>
             </div>
 
@@ -503,9 +513,9 @@ pro: {
               <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Headphones className="w-6 h-6 text-purple-600" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">24/7 Support</h3>
+              <h3 className="font-semibold text-gray-900 mb-2">Fast Support</h3>
               <p className="text-gray-600 text-sm">
-                Get help whenever you need it
+                Get help when you need it most
               </p>
             </div>
 
@@ -527,7 +537,7 @@ pro: {
         <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-2xl p-8 text-center text-white">
           <h2 className="text-3xl font-bold mb-4">Ready to Start Growing?</h2>
           <p className="text-xl opacity-90 mb-8">
-            Join thousands of Nigerian creators building their online presence
+            Join Nigerian creators building their online presence
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
