@@ -80,7 +80,7 @@ const analyticsSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: false, // Using custom timestamp field
+    timestamps: false,
   }
 );
 

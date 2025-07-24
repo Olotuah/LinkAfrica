@@ -596,7 +596,7 @@ const Dashboard = () => {
                 Manage your links and grow your online presence
               </p>
             </div>
-            // Find this section in Dashboard and update:
+
             <div className="text-right">
               <div className="text-sm opacity-75">Your Profile</div>
               <div className="font-medium">
@@ -869,7 +869,7 @@ const Dashboard = () => {
               See how your profile looks to visitors
             </p>
           </button>
-          // Add this button to the Quick Actions section:
+
           <button
             onClick={generateQRCode}
             className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"
