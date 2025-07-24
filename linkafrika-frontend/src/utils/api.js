@@ -30,22 +30,39 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Only redirect on 401 AND if it's not a login/register request
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem("linkafrika_token");
-      localStorage.removeItem("linkafrika_user");
-      window.location.href = "/login";
+      const isAuthRequest =
+        error.config?.url?.includes("/auth/login") ||
+        error.config?.url?.includes("/auth/register");
+
+      if (!isAuthRequest) {
+        // Token expired or invalid for protected routes
+        localStorage.removeItem("linkafrika_token");
+        localStorage.removeItem("linkafrika_user");
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }
 );
 
-// Auth API functions
+// Create a separate axios instance for auth requests (no interceptors)
+const authApi = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Auth API functions (using separate instance to avoid interceptor issues)
 export const authAPI = {
-  register: (userData) => api.post("/auth/register", userData),
-  login: (credentials) => api.post("/auth/login", credentials),
-  checkUsername: (username) => api.post("/auth/check-username", { username }),
-  getMe: () => api.get("/auth/me"),
+  register: (userData) => authApi.post("/auth/register", userData),
+  login: (credentials) => authApi.post("/auth/login", credentials),
+  checkUsername: (username) =>
+    authApi.post("/auth/check-username", { username }),
+  getMe: () => api.get("/auth/me"), // This one can use the main api since it needs auth
 };
 
 // User API functions
