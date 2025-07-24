@@ -15,11 +15,15 @@ const USERS_FILE = path.join(DATA_DIR, "users.json");
 const LINKS_FILE = path.join(DATA_DIR, "links.json");
 const ANALYTICS_FILE = path.join(DATA_DIR, "analytics.json");
 
-// Add this after your imports
+// CORS configuration
 const corsOptions = {
   origin:
     process.env.NODE_ENV === "production"
-      ? "https://link-africa.vercel.app" // production frontend URL
+      ? [
+          "https://link-africa.vercel.app", // Your actual Vercel domain
+          "https://linkafrica.vercel.app", // Backup domain
+          process.env.FRONTEND_URL,
+        ]
       : [
           "http://localhost:3000", // React development server URL
           "http://localhost:5173", // Vite development server URL
@@ -30,7 +34,6 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// Replace app.use(cors()); with:
 app.use(cors(corsOptions));
 
 // Create data directory if it doesn't exist
@@ -108,6 +111,7 @@ app.get("/health", (req, res) => {
     users: users.length,
     links: links.length,
     analytics: analytics.length,
+    environment: process.env.NODE_ENV || "development",
     timestamp: new Date().toISOString(),
   });
 });
@@ -116,6 +120,8 @@ app.get("/health", (req, res) => {
 app.get("/test", (req, res) => {
   res.json({
     message: "Hello from LinkAfrika backend!",
+    environment: process.env.NODE_ENV || "development",
+    corsOrigin: corsOptions.origin,
     endpoints: [
       "POST /api/auth/register",
       "POST /api/auth/login",
@@ -791,11 +797,37 @@ app.use("*", (req, res) => {
 });
 
 // ===================
+// KEEP-ALIVE SYSTEM (Prevents Render Spin-Down)
+// ===================
+
+const KEEP_ALIVE_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://linkafrica.onrender.com/health"
+    : null;
+
+if (KEEP_ALIVE_URL) {
+  // Keep server alive by pinging itself every 8 minutes
+  setInterval(async () => {
+    try {
+      const response = await fetch(KEEP_ALIVE_URL);
+      console.log(
+        `🏓 Keep-alive ping: ${response.status} at ${new Date().toISOString()}`
+      );
+    } catch (error) {
+      console.log("🏓 Keep-alive ping failed:", error.message);
+    }
+  }, 8 * 60 * 1000); // 8 minutes (less than 15-minute Render timeout)
+
+  console.log("🏓 Keep-alive pinger started - backend will stay awake!");
+}
+
+// ===================
 // SERVER START
 // ===================
 
 app.listen(PORT, () => {
   console.log(`🚀 LinkAfrika API running on http://localhost:${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(
     `📊 Loaded ${users.length} users, ${links.length} links, ${analytics.length} analytics events`
   );
