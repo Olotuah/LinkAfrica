@@ -97,27 +97,22 @@ const Pricing = () => {
     }
 
     if (!isAuthenticated) {
-      // Store selected plan and redirect to signup
       localStorage.setItem("selectedPlan", planType);
       navigate("/signup");
       return;
     }
 
     if (planType === "free") {
-      // Already on free plan
       if (!user?.isPro) {
         alert("You're already on the Free plan!");
         return;
       }
-      // Downgrade from Pro (would need confirmation)
       alert("Contact support to downgrade your plan.");
       return;
     }
 
     if (planType === "pro") {
-      // Simulate payment process
       alert("Redirecting to payment... (This would integrate with Paystack)");
-      // In real app: redirect to payment processor
     }
   };
 
@@ -178,8 +173,7 @@ const Pricing = () => {
         </div>
         {billingCycle === "yearly" && plan.price > 0 && (
           <div className="text-sm text-green-600 font-medium">
-            Save ₦{(plan.price * 12 - plan.yearlyPrice).toLocaleString()}{" "}
-            yearly!
+            Save ₦{(plan.price * 12 - plan.yearlyPrice).toLocaleString()} yearly!
           </div>
         )}
       </div>
@@ -250,7 +244,6 @@ const Pricing = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Choose Your Plan
@@ -259,7 +252,6 @@ const Pricing = () => {
             Start free, upgrade when you're ready to grow
           </p>
 
-          {/* Billing Toggle */}
           <div className="flex items-center justify-center space-x-4 mb-8">
             <span
               className={`${
@@ -295,245 +287,12 @@ const Pricing = () => {
           </div>
         </div>
 
-        {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           <PlanCard plan={plans.free} planType="free" />
           <PlanCard plan={plans.pro} planType="pro" />
           <PlanCard plan={plans.business} planType="business" />
         </div>
 
-        {/* Feature Comparison Table */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-16">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
-            Compare All Features
-          </h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-4 px-6">Features</th>
-                  <th className="text-center py-4 px-6">Free</th>
-                  <th className="text-center py-4 px-6">Pro</th>
-                  <th className="text-center py-4 px-6">Business</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                <tr>
-                  <td className="py-4 px-6 font-medium">Number of Links</td>
-                  <td className="py-4 px-6 text-center">3</td>
-                  <td className="py-4 px-6 text-center">Unlimited</td>
-                  <td className="py-4 px-6 text-center">Unlimited</td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium">Custom Domain</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-red-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="text-gray-400">Coming Q2</span>
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="text-gray-400">Coming Q2</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium">
-                    Sell Digital Products
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-red-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium">Advanced Analytics</td>
-                  <td className="py-4 px-6 text-center">Basic</td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium">QR Code Generator</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-red-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium">Team Management</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-red-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-red-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="text-gray-400">Coming Soon</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium">API Access</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-red-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-red-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="text-gray-400">Coming Soon</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium">Priority Support</td>
-                  <td className="py-4 px-6 text-center">Standard</td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-green-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="text-gray-400">Dedicated</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* FAQ Section */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-16">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
-            Frequently Asked Questions
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Can I switch plans anytime?
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Yes! You can upgrade or downgrade your plan at any time. Changes
-                take effect immediately.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                What payment methods do you accept?
-              </h3>
-              <p className="text-gray-600 text-sm">
-                We accept all major Nigerian payment methods through Paystack
-                including card payments, bank transfers, and mobile money.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Is there a free trial for Pro?
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Yes! Pro comes with a 7-day free trial. No credit card required
-                to start.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                When will Business plan be available?
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Our Business plan is launching Q2 2025. Join the waitlist to be
-                notified first and get early access pricing.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Do you offer refunds?
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Yes, we offer a 30-day money-back guarantee for all paid plans
-                if you're not satisfied.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Can I use my own domain?
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Custom domains are coming in Q2 2025 for Pro and Business plans.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Trust Indicators */}
-        <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">
-            Trusted by Nigerian Creators
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Shield className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Secure & Reliable
-              </h3>
-              <p className="text-gray-600 text-sm">
-                99.9% uptime with enterprise-grade security
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">1,000+ Users</h3>
-              <p className="text-gray-600 text-sm">
-                Join growing community of Nigerian creators
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Headphones className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Fast Support</h3>
-              <p className="text-gray-600 text-sm">
-                Get help when you need it most
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-6 h-6 text-orange-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Lightning Fast
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Optimized for speed and performance
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* CTA Section */}
         <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-2xl p-8 text-center text-white">
           <h2 className="text-3xl font-bold mb-4">Ready to Start Growing?</h2>
           <p className="text-xl opacity-90 mb-8">
@@ -555,7 +314,6 @@ const Pricing = () => {
           </div>
         </div>
 
-        {/* Coming Soon Modal */}
         {showComingSoon && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center">
