@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }) => {
         console.log("✅ Login successful via API:", userData);
         return { success: true, user: userData };
       } catch (error) {
-        console.error("❌ API Login failed, trying localStorage fallback...");
+        console.log("❌ API Login failed, trying localStorage fallback...");
 
         // FALLBACK: Check if user exists in localStorage users array
         let users = [];
@@ -103,15 +103,21 @@ export const AuthProvider = ({ children }) => {
         console.log("📊 Total users in array:", users.length);
 
         const foundUser = users.find(
-          (u) => u.email.toLowerCase() === email.toLowerCase()
+          (u) => u.email && u.email.toLowerCase() === email.toLowerCase().trim()
         );
 
         if (foundUser) {
           console.log("👤 User found in localStorage:", foundUser.email);
+          console.log(
+            "🔍 User onboarding status:",
+            foundUser.onboardingCompleted
+          );
+          console.log("🔍 User Pro status:", foundUser.isPro);
+          console.log("🔍 User username:", foundUser.username);
 
           // Check password
           if (foundUser.password === password) {
-            // IMPORTANT: Make sure user exists in users array after login
+            // Generate token and set session
             const token = "mock_token_" + Date.now();
             localStorage.setItem("token", token);
             localStorage.setItem("user", JSON.stringify(foundUser));
@@ -129,7 +135,11 @@ export const AuthProvider = ({ children }) => {
           console.error("❌ User not found in localStorage");
           console.log(
             "📋 Available users:",
-            users.map((u) => ({ email: u.email, id: u.id }))
+            users.map((u) => ({
+              email: u.email,
+              id: u.id,
+              username: u.username,
+            }))
           );
           return { success: false, error: "No account found with this email" };
         }
@@ -151,7 +161,31 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       console.log("📝 Attempting registration for:", userData.email);
 
+      // CRITICAL FIX: Always check localStorage first to prevent duplicates
+      let users = [];
       try {
+        users = JSON.parse(localStorage.getItem("users") || "[]");
+      } catch (e) {
+        console.warn("Invalid users data, starting fresh");
+        users = [];
+      }
+
+      // Check if user already exists in localStorage FIRST
+      const existingUser = users.find(
+        (u) => u.email.toLowerCase() === userData.email.toLowerCase().trim()
+      );
+
+      if (existingUser) {
+        console.log("❌ User already exists in localStorage:", userData.email);
+        return {
+          success: false,
+          error:
+            "An account with this email already exists. Please login instead.",
+        };
+      }
+
+      try {
+        // Try API registration first
         const response = await authAPI.register(userData);
         console.log("✅ Registration successful via API");
         return {
@@ -161,30 +195,23 @@ export const AuthProvider = ({ children }) => {
       } catch (apiError) {
         console.log("API registration failed, using localStorage fallback");
 
-        // CRITICAL FIX: Ensure users array exists and is properly managed
-        let users = [];
-        try {
-          users = JSON.parse(localStorage.getItem("users") || "[]");
-        } catch (e) {
-          console.warn("Invalid users data, starting fresh");
-          users = [];
-        }
+        // Double-check for duplicates again (in case of race conditions)
+        const updatedUsers = JSON.parse(localStorage.getItem("users") || "[]");
+        const duplicateCheck = updatedUsers.find(
+          (u) => u.email.toLowerCase() === userData.email.toLowerCase().trim()
+        );
 
-        // Check if user already exists
-        if (
-          users.find(
-            (u) => u.email.toLowerCase() === userData.email.toLowerCase()
-          )
-        ) {
+        if (duplicateCheck) {
           return {
             success: false,
-            error: "User already exists with this email",
+            error:
+              "An account with this email already exists. Please login instead.",
           };
         }
 
         // Create new user with proper structure
         const newUser = {
-          id: Date.now(), // Unique ID
+          id: Date.now() + Math.random(), // More unique ID to prevent collisions
           name: userData.name.trim(),
           email: userData.email.toLowerCase().trim(),
           password: userData.password, // In production, hash this!
@@ -202,12 +229,19 @@ export const AuthProvider = ({ children }) => {
         // Add to users array
         users.push(newUser);
 
-        // Save users array
-        localStorage.setItem("users", JSON.stringify(users));
-
-        console.log("✅ User saved to localStorage users array");
-        console.log("👤 New user:", { id: newUser.id, email: newUser.email });
-        console.log("📊 Total users now:", users.length);
+        // Save users array with error handling
+        try {
+          localStorage.setItem("users", JSON.stringify(users));
+          console.log("✅ User saved to localStorage users array");
+          console.log("👤 New user:", { id: newUser.id, email: newUser.email });
+          console.log("📊 Total users now:", users.length);
+        } catch (storageError) {
+          console.error("❌ Failed to save to localStorage:", storageError);
+          return {
+            success: false,
+            error: "Failed to create account. Please try again.",
+          };
+        }
 
         return {
           success: true,

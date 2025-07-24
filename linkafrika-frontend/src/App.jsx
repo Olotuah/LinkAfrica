@@ -392,31 +392,70 @@ const SignupPage = () => {
   const [error, setError] = React.useState("");
   const [success, setSuccess] = React.useState("");
 
+  // UPDATED: Enhanced handleSubmit function
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setSuccess("");
 
-    // Client-side validation
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      setLoading(false);
-      return;
-    }
-
+    // Enhanced client-side validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
     if (!formData.name.trim()) {
       setError("Name is required");
       setLoading(false);
       return;
     }
 
+    if (formData.name.trim().length < 2) {
+      setError("Name must be at least 2 characters long");
+      setLoading(false);
+      return;
+    }
+
+    if (!emailRegex.test(formData.email.trim())) {
+      setError("Please enter a valid email address");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      setLoading(false);
+      return;
+    }
+
+    // Check for existing user before attempting registration
+    try {
+      const users = JSON.parse(localStorage.getItem("users") || "[]");
+      const existingUser = users.find(
+        (u) => u.email.toLowerCase() === formData.email.toLowerCase().trim()
+      );
+      
+      if (existingUser) {
+        setError("An account with this email already exists. Please login instead.");
+        setLoading(false);
+        return;
+      }
+    } catch (storageError) {
+      console.warn("Could not check existing users:", storageError);
+    }
+
     console.log("🚀 Starting registration process...");
-    const result = await register(formData);
+    
+    // Prepare clean data
+    const cleanFormData = {
+      name: formData.name.trim(),
+      email: formData.email.toLowerCase().trim(),
+      password: formData.password,
+    };
+    
+    const result = await register(cleanFormData);
 
     if (result.success) {
       console.log("✅ Registration successful, redirecting to login...");
-      setSuccess("Account created successfully! Please login to continue.");
+      setSuccess(result.message || "Account created successfully! Please login to continue.");
 
       // Clear form
       setFormData({ name: "", email: "", password: "" });
@@ -528,6 +567,8 @@ const SignupPage = () => {
     </div>
   );
 };
+
+export default SignupPage;
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {

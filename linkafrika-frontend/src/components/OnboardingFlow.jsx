@@ -196,18 +196,25 @@ const OnboardingFlow = () => {
 
       console.log("📝 Updating profile with:", updateData);
 
-      // Get current user
-      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      if (!currentUser.id && !currentUser.email) {
-        throw new Error("No current user found");
+      // Get current user with better error handling
+      let currentUser;
+      try {
+        currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      } catch (e) {
+        console.error("Failed to parse current user");
+        throw new Error("Session error. Please login again.");
       }
 
-      // Update current user
+      if (!currentUser.id && !currentUser.email) {
+        throw new Error("No current user found. Please login again.");
+      }
+
+      // Update current user in localStorage
       const updatedCurrentUser = { ...currentUser, ...updateData };
       localStorage.setItem("user", JSON.stringify(updatedCurrentUser));
       console.log("✅ Updated current user in localStorage");
 
-      // CRITICAL FIX: Update/Add user in the users array
+      // CRITICAL FIX: Properly update users array with better error handling
       let users = [];
       try {
         users = JSON.parse(localStorage.getItem("users") || "[]");
@@ -218,31 +225,59 @@ const OnboardingFlow = () => {
 
       console.log("📊 Users array before update:", users.length);
 
-      const userIndex = users.findIndex(
-        (u) =>
-          (u.id && u.id === currentUser.id) ||
-          (u.email && u.email.toLowerCase() === currentUser.email.toLowerCase())
-      );
+      // Find user by ID first, then by email as fallback
+      let userIndex = -1;
+      if (currentUser.id) {
+        userIndex = users.findIndex((u) => u.id === currentUser.id);
+      }
+
+      if (userIndex === -1 && currentUser.email) {
+        userIndex = users.findIndex(
+          (u) =>
+            u.email && u.email.toLowerCase() === currentUser.email.toLowerCase()
+        );
+      }
 
       if (userIndex !== -1) {
-        // Update existing user
+        // Update existing user completely
         users[userIndex] = { ...users[userIndex], ...updateData };
         console.log(`✅ Updated existing user at index ${userIndex}`);
+        console.log("🔄 Updated user data:", users[userIndex]);
       } else {
-        // Add user to array if not found (fallback)
+        // If user not found, add them (this shouldn't happen but is a safety net)
         console.warn("⚠️ User not found in users array, adding them...");
         users.push(updatedCurrentUser);
         console.log("✅ Added user to users array");
       }
 
-      // Save updated users array
-      localStorage.setItem("users", JSON.stringify(users));
-      console.log("💾 Saved users array with", users.length, "users");
-      console.log(
-        "👤 User with username:",
-        updateData.username,
-        "is now in users array"
+      // Save updated users array with error handling
+      try {
+        localStorage.setItem("users", JSON.stringify(users));
+        console.log("💾 Saved users array with", users.length, "users");
+      } catch (storageError) {
+        console.error("❌ Failed to save users array:", storageError);
+        throw new Error("Failed to save profile data. Please try again.");
+      }
+
+      // Verify the data was saved correctly
+      const verifyUsers = JSON.parse(localStorage.getItem("users") || "[]");
+      const verifyUser = verifyUsers.find(
+        (u) => u.username === profileData.username
       );
+
+      if (verifyUser) {
+        console.log(
+          "✅ Verification successful - user found with username:",
+          verifyUser.username
+        );
+        console.log(
+          "🔍 User onboarding status:",
+          verifyUser.onboardingCompleted
+        );
+        console.log("🔍 User Pro status:", verifyUser.isPro);
+      } else {
+        console.warn("⚠️ Verification failed - user not found after save");
+      }
 
       // Update auth context
       if (updateUser && typeof updateUser === "function") {
@@ -250,7 +285,7 @@ const OnboardingFlow = () => {
         console.log("✅ Updated auth context");
       }
 
-      // Save initial links
+      // Save initial links (existing code remains the same)
       const enabledLinks = initialLinks.filter(
         (link) => link.enabled && link.url.trim()
       );
@@ -285,7 +320,8 @@ const OnboardingFlow = () => {
     } catch (error) {
       console.error("❌ Error completing onboarding:", error);
       setError(
-        "Setup completed but with some limitations. You can continue to dashboard."
+        error.message ||
+          "Setup completed but with some limitations. You can continue to dashboard."
       );
 
       setTimeout(() => {
