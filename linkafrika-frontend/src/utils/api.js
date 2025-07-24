@@ -26,23 +26,11 @@ api.interceptors.request.use(
   }
 );
 
-// Handle response errors
+// Handle response errors (simplified - no automatic redirects)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only redirect on 401 AND if it's not a login/register request
-    if (error.response?.status === 401) {
-      const isAuthRequest =
-        error.config?.url?.includes("/auth/login") ||
-        error.config?.url?.includes("/auth/register");
-
-      if (!isAuthRequest) {
-        // Token expired or invalid for protected routes
-        localStorage.removeItem("linkafrika_token");
-        localStorage.removeItem("linkafrika_user");
-        window.location.href = "/login";
-      }
-    }
+    // Just pass through errors without automatic handling
     return Promise.reject(error);
   }
 );
