@@ -426,7 +426,7 @@ const Dashboard = () => {
   };
 
   const copyProfileUrl = () => {
-    const profileUrl = `https://linkafrika.com/profile/${
+    const profileUrl = `https://link-africa.vercel.app/profile/${
       user?.username || user?.email || "yourprofile"
     }`;
     navigator.clipboard.writeText(profileUrl);
