@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.log("❌ API Login failed, trying localStorage fallback...");
 
-        // FALLBACK: Check if user exists in localStorage users array
+        // CRITICAL FALLBACK: Check localStorage users array
         let users = [];
         try {
           users = JSON.parse(localStorage.getItem("users") || "[]");
@@ -102,31 +102,69 @@ export const AuthProvider = ({ children }) => {
         console.log("🔍 Searching in users array for:", email);
         console.log("📊 Total users in array:", users.length);
 
+        // Find user with case-insensitive email matching
         const foundUser = users.find(
           (u) => u.email && u.email.toLowerCase() === email.toLowerCase().trim()
         );
 
         if (foundUser) {
           console.log("👤 User found in localStorage:", foundUser.email);
+          console.log("🔍 User complete data:", foundUser);
+
+          // CRITICAL: Log all important fields
+          console.log("📊 User onboarding data:");
+          console.log("  - Username:", foundUser.username);
           console.log(
-            "🔍 User onboarding status:",
+            "  - Onboarding completed:",
             foundUser.onboardingCompleted
           );
-          console.log("🔍 User Pro status:", foundUser.isPro);
-          console.log("🔍 User username:", foundUser.username);
+          console.log("  - Pro status:", foundUser.isPro);
+          console.log("  - Theme:", foundUser.theme);
+          console.log("  - Display name:", foundUser.displayName);
+          console.log("  - Bio:", foundUser.bio);
 
           // Check password
           if (foundUser.password === password) {
-            // Generate token and set session
+            // Generate token and set session with COMPLETE user data
             const token = "mock_token_" + Date.now();
-            localStorage.setItem("token", token);
-            localStorage.setItem("user", JSON.stringify(foundUser));
 
-            setUser(foundUser);
+            // CRITICAL: Ensure we preserve ALL user data, not just basic fields
+            const completeUserData = {
+              id: foundUser.id,
+              email: foundUser.email,
+              name: foundUser.name,
+              displayName: foundUser.displayName,
+              username: foundUser.username,
+              bio: foundUser.bio,
+              theme: foundUser.theme,
+              isPro: foundUser.isPro,
+              onboardingCompleted: foundUser.onboardingCompleted,
+              profileViews: foundUser.profileViews || 0,
+              createdAt: foundUser.createdAt,
+              updatedAt: foundUser.updatedAt,
+              // Include any other fields that might exist
+              ...foundUser,
+            };
+
+            console.log(
+              "💾 Saving complete user data to session:",
+              completeUserData
+            );
+
+            localStorage.setItem("token", token);
+            localStorage.setItem("user", JSON.stringify(completeUserData));
+
+            setUser(completeUserData);
             setIsAuthenticated(true);
 
-            console.log("✅ Fallback login successful:", foundUser);
-            return { success: true, user: foundUser };
+            console.log("✅ Fallback login successful with complete data");
+            console.log("✅ Session user data saved:", {
+              username: completeUserData.username,
+              onboardingCompleted: completeUserData.onboardingCompleted,
+              isPro: completeUserData.isPro,
+            });
+
+            return { success: true, user: completeUserData };
           } else {
             console.error("❌ Password mismatch");
             return { success: false, error: "Incorrect password" };
@@ -139,6 +177,7 @@ export const AuthProvider = ({ children }) => {
               email: u.email,
               id: u.id,
               username: u.username,
+              onboardingCompleted: u.onboardingCompleted,
             }))
           );
           return { success: false, error: "No account found with this email" };
@@ -161,7 +200,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       console.log("📝 Attempting registration for:", userData.email);
 
-      // CRITICAL FIX: Always check localStorage first to prevent duplicates
+      // CRITICAL: Always check localStorage first to prevent duplicates
       let users = [];
       try {
         users = JSON.parse(localStorage.getItem("users") || "[]");
@@ -195,7 +234,7 @@ export const AuthProvider = ({ children }) => {
       } catch (apiError) {
         console.log("API registration failed, using localStorage fallback");
 
-        // Double-check for duplicates again (in case of race conditions)
+        // Double-check for duplicates again (race condition protection)
         const updatedUsers = JSON.parse(localStorage.getItem("users") || "[]");
         const duplicateCheck = updatedUsers.find(
           (u) => u.email.toLowerCase() === userData.email.toLowerCase().trim()
@@ -209,9 +248,9 @@ export const AuthProvider = ({ children }) => {
           };
         }
 
-        // Create new user with proper structure
+        // Create new user with proper structure and unique ID
         const newUser = {
-          id: Date.now() + Math.random(), // More unique ID to prevent collisions
+          id: Date.now() + Math.floor(Math.random() * 1000), // More unique ID
           name: userData.name.trim(),
           email: userData.email.toLowerCase().trim(),
           password: userData.password, // In production, hash this!
@@ -226,6 +265,12 @@ export const AuthProvider = ({ children }) => {
           updatedAt: new Date().toISOString(),
         };
 
+        console.log("👤 Creating new user:", {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+        });
+
         // Add to users array
         users.push(newUser);
 
@@ -235,6 +280,15 @@ export const AuthProvider = ({ children }) => {
           console.log("✅ User saved to localStorage users array");
           console.log("👤 New user:", { id: newUser.id, email: newUser.email });
           console.log("📊 Total users now:", users.length);
+
+          // Verify the save worked
+          const verifyUsers = JSON.parse(localStorage.getItem("users") || "[]");
+          const verifyUser = verifyUsers.find((u) => u.email === newUser.email);
+          if (verifyUser) {
+            console.log("✅ Registration verification successful");
+          } else {
+            console.error("❌ Registration verification failed");
+          }
         } catch (storageError) {
           console.error("❌ Failed to save to localStorage:", storageError);
           return {
@@ -258,7 +312,6 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   };
-
   const updateUser = (updatedUserData) => {
     try {
       const updatedUser = { ...user, ...updatedUserData };
