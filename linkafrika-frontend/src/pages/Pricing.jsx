@@ -45,27 +45,28 @@ const Pricing = () => {
         "Standard support",
       ],
     },
-    pro: {
-      name: "Pro Creator",
-      price: 3000,
-      yearlyPrice: 30000, // 2 months free
-      icon: <Crown className="w-8 h-8" />,
-      color: "from-orange-500 to-green-500",
-      popular: true,
-      features: [
-        "Unlimited links",
-        "Sell digital products",
-        "Advanced analytics",
-        "Custom themes",
-        "Remove LinkAfrika branding",
-        "Priority support",
-        "Custom domain",
-        "Email marketing integration",
-        "Social media scheduler",
-        "QR code generator",
-      ],
-      limitations: [],
-    },
+    // In Pricing.jsx, update the pro plan features:
+pro: {
+  name: "Pro Creator",
+  price: 3000,
+  yearlyPrice: 30000,
+  icon: <Crown className="w-8 h-8" />,
+  color: "from-orange-500 to-green-500",
+  popular: true,
+  features: [
+    "Unlimited links",
+    "Sell digital products", // ✅ This works
+    "Advanced analytics", // ✅ This works
+    "Custom themes", // ✅ This works
+    "Remove LinkAfrika branding",
+    "Priority support",
+    "Custom domain (Coming Q2 2025)", // ❌ This doesn't work yet
+    "Email marketing integration (Coming Q2 2025)", // ❌ This doesn't work yet
+    "Social media scheduler (Coming Q2 2025)", // ❌ This doesn't work yet
+    "QR code generator", // ✅ Can implement this
+  ],
+  limitations: [],
+},
     business: {
       name: "Business Team",
       price: 10000,
@@ -157,22 +158,30 @@ const Pricing = () => {
         </div>
         <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
         <div className="mb-4">
-          <span className="text-4xl font-bold text-gray-900">
-            ₦
-            {billingCycle === "monthly"
-              ? plan.price.toLocaleString()
-              : Math.floor(plan.yearlyPrice / 12).toLocaleString()}
-          </span>
-          <span className="text-gray-500 ml-2">
-            /{billingCycle === "monthly" ? "month" : "month"}
-          </span>
-        </div>
-        {billingCycle === "yearly" && plan.price > 0 && (
-          <div className="text-sm text-green-600 font-medium">
-            Save ₦{(plan.price * 12 - plan.yearlyPrice).toLocaleString()} yearly
-          </div>
-        )}
+  {billingCycle === "monthly" ? (
+    <>
+      <span className="text-4xl font-bold text-gray-900">
+        ₦{plan.price.toLocaleString()}
+      </span>
+      <span className="text-gray-500 ml-2">/month</span>
+    </>
+  ) : (
+    <>
+      <span className="text-4xl font-bold text-gray-900">
+        ₦{plan.yearlyPrice.toLocaleString()}
+      </span>
+      <span className="text-gray-500 ml-2">/year</span>
+      <div className="text-lg text-gray-600 mt-1">
+        (₦{Math.floor(plan.yearlyPrice / 12).toLocaleString()}/month)
       </div>
+    </>
+  )}
+</div>
+{billingCycle === "yearly" && plan.price > 0 && (
+  <div className="text-sm text-green-600 font-medium">
+    Save ₦{(plan.price * 12 - plan.yearlyPrice).toLocaleString()} yearly!
+  </div>
+)}
 
       <div className="space-y-4 mb-8">
         <h4 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">

@@ -56,6 +56,22 @@ const Dashboard = () => {
   const [error, setError] = useState("");
   const [editingLink, setEditingLink] = useState(null);
 
+  // Add this function in Dashboard.jsx:
+  const generateQRCode = () => {
+    const profileUrl = `${window.location.origin}/profile/${
+      user?.username || user?.email
+    }`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+      profileUrl
+    )}`;
+
+    // Create modal or download
+    const link = document.createElement("a");
+    link.href = qrUrl;
+    link.download = `${user?.username || user?.email}-qr-code.png`;
+    link.click();
+  };
+
   const [newLink, setNewLink] = useState({
     title: "",
     url: "",
@@ -426,7 +442,8 @@ const Dashboard = () => {
   };
 
   const copyProfileUrl = () => {
-    const profileUrl = `https://link-africa.vercel.app/profile/${
+    // CORRECT (uses current domain):
+    const profileUrl = `${window.location.origin}/profile/${
       user?.username || user?.email || "yourprofile"
     }`;
     navigator.clipboard.writeText(profileUrl);
@@ -579,10 +596,11 @@ const Dashboard = () => {
                 Manage your links and grow your online presence
               </p>
             </div>
+            // Find this section in Dashboard and update:
             <div className="text-right">
               <div className="text-sm opacity-75">Your Profile</div>
               <div className="font-medium">
-                linkafrika.com/profile/
+                {window.location.host}/profile/
                 {user?.username || user?.email || "yourprofile"}
               </div>
             </div>
@@ -851,7 +869,27 @@ const Dashboard = () => {
               See how your profile looks to visitors
             </p>
           </button>
-
+          // Add this button to the Quick Actions section:
+          <button
+            onClick={generateQRCode}
+            className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"
+          >
+            <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+              <svg
+                className="w-5 h-5 text-white"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zm14 8V3h-8v8h8zm-6-6h4v4h-4V5zm-8 14h8v-8H3v8zm2-6h4v4H5v-4z" />
+              </svg>
+            </div>
+            <h3 className="font-semibold text-gray-900 mb-2">
+              Generate QR Code
+            </h3>
+            <p className="text-gray-600 text-sm">
+              Download QR code for your profile
+            </p>
+          </button>
           <button
             onClick={() => navigate("/analytics")}
             className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"
@@ -862,7 +900,6 @@ const Dashboard = () => {
               Track your link performance and engagement
             </p>
           </button>
-
           <button
             onClick={() => navigate("/pricing")}
             className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"
