@@ -401,7 +401,7 @@ const SignupPage = () => {
 
     // Enhanced client-side validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
+
     if (!formData.name.trim()) {
       setError("Name is required");
       setLoading(false);
@@ -432,9 +432,11 @@ const SignupPage = () => {
       const existingUser = users.find(
         (u) => u.email.toLowerCase() === formData.email.toLowerCase().trim()
       );
-      
+
       if (existingUser) {
-        setError("An account with this email already exists. Please login instead.");
+        setError(
+          "An account with this email already exists. Please login instead."
+        );
         setLoading(false);
         return;
       }
@@ -443,19 +445,22 @@ const SignupPage = () => {
     }
 
     console.log("🚀 Starting registration process...");
-    
+
     // Prepare clean data
     const cleanFormData = {
       name: formData.name.trim(),
       email: formData.email.toLowerCase().trim(),
       password: formData.password,
     };
-    
+
     const result = await register(cleanFormData);
 
     if (result.success) {
       console.log("✅ Registration successful, redirecting to login...");
-      setSuccess(result.message || "Account created successfully! Please login to continue.");
+      setSuccess(
+        result.message ||
+          "Account created successfully! Please login to continue."
+      );
 
       // Clear form
       setFormData({ name: "", email: "", password: "" });
@@ -567,8 +572,6 @@ const SignupPage = () => {
     </div>
   );
 };
-
-export default SignupPage;
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
