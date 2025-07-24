@@ -19,11 +19,10 @@ const ANALYTICS_FILE = path.join(DATA_DIR, "analytics.json");
 const corsOptions = {
   origin:
     process.env.NODE_ENV === "production"
-      ? ["https://link-africa.vercel.app"]
+      ? "https://link-africa.vercel.app" // production frontend URL
       : [
-          "http://localhost:3000",
-          "http://localhost:5173",
-          "http://localhost:5000",
+          "http://localhost:3000", // React development server URL
+          "http://localhost:5173", // Vite development server URL
         ],
   credentials: true,
   optionsSuccessStatus: 200,
