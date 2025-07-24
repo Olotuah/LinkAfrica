@@ -2,15 +2,37 @@ import express from "express";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
+import { config } from "dotenv";
+
+config();
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 // File paths for persistent storage
 const DATA_DIR = "./data";
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const LINKS_FILE = path.join(DATA_DIR, "links.json");
 const ANALYTICS_FILE = path.join(DATA_DIR, "analytics.json");
+
+// Add this after your imports
+const corsOptions = {
+  origin:
+    process.env.NODE_ENV === "production"
+      ? ["https://link-africa.vercel.app"]
+      : [
+          "http://localhost:3000",
+          "http://localhost:5173",
+          "http://localhost:5000",
+        ],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+// Replace app.use(cors()); with:
+app.use(cors(corsOptions));
 
 // Create data directory if it doesn't exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -50,7 +72,6 @@ console.log(
 );
 
 // Middleware
-app.use(cors());
 app.use(express.json());
 
 // Request logging middleware
