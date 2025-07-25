@@ -216,282 +216,199 @@ const OnboardingFlow = () => {
   };
 
   const completeOnboarding = async () => {
+  try {
+    console.log("🚀 Starting onboarding completion...");
+    console.log("📝 Profile data to save:", profileData);
+
+    const updateData = {
+      username: profileData.username,
+      displayName: profileData.displayName,
+      bio: profileData.bio,
+      theme: profileData.theme,
+      isPro: profileData.isPro,
+      onboardingCompleted: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    console.log("📝 Updating profile with:", updateData);
+
+    // Get current user with better error handling
+    let currentUser;
     try {
-      console.log("🚀 Starting onboarding completion...");
-      console.log("📝 Profile data to save:", profileData);
-
-      const updateData = {
-        username: profileData.username,
-        displayName: profileData.displayName,
-        bio: profileData.bio,
-        theme: profileData.theme,
-        isPro: profileData.isPro,
-        onboardingCompleted: true,
-        updatedAt: new Date().toISOString(),
-      };
-
-      console.log("📝 Updating profile with:", updateData);
-
-      // Get current user with better error handling
-      let currentUser;
-      try {
-        currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      } catch (e) {
-        console.error("Failed to parse current user");
-        throw new Error("Session error. Please login again.");
-      }
-
-      console.log("👤 Current user before update:", currentUser);
-
-      if (!currentUser.id && !currentUser.email) {
-        throw new Error("No current user found. Please login again.");
-      }
-
-      // Update current user in localStorage
-      const updatedCurrentUser = { ...currentUser, ...updateData };
-
-      try {
-        localStorage.setItem("user", JSON.stringify(updatedCurrentUser));
-        console.log(
-          "✅ Updated current user in localStorage:",
-          updatedCurrentUser
-        );
-      } catch (storageError) {
-        console.error("❌ Failed to update current user:", storageError);
-        throw new Error("Failed to save user session. Please try again.");
-      }
-
-      // CRITICAL: Update users array with comprehensive error handling
-      let users = [];
-      try {
-        const usersData = localStorage.getItem("users");
-        console.log("📊 Raw users data from localStorage:", usersData);
-        users = JSON.parse(usersData || "[]");
-      } catch (e) {
-        console.warn("Invalid users data, starting fresh:", e);
-        users = [];
-      }
-
-      console.log("📊 Users array before update:", users.length, "users");
-      console.log(
-        "🔍 Looking for user with ID:",
-        currentUser.id,
-        "or email:",
-        currentUser.email
-      );
-
-      // Find user with multiple fallback methods
-      let userIndex = -1;
-      let foundUser = null;
-
-      // Method 1: Find by ID
-      if (currentUser.id) {
-        userIndex = users.findIndex((u) => u.id === currentUser.id);
-        if (userIndex !== -1) {
-          foundUser = users[userIndex];
-          console.log("✅ Found user by ID at index:", userIndex);
-        }
-      }
-
-      // Method 2: Find by email (case-insensitive)
-      if (userIndex === -1 && currentUser.email) {
-        userIndex = users.findIndex(
-          (u) =>
-            u.email && u.email.toLowerCase() === currentUser.email.toLowerCase()
-        );
-        if (userIndex !== -1) {
-          foundUser = users[userIndex];
-          console.log("✅ Found user by email at index:", userIndex);
-        }
-      }
-
-      // Method 3: Find by existing username (in case of re-onboarding)
-      if (userIndex === -1 && currentUser.username) {
-        userIndex = users.findIndex(
-          (u) =>
-            u.username &&
-            u.username.toLowerCase() === currentUser.username.toLowerCase()
-        );
-        if (userIndex !== -1) {
-          foundUser = users[userIndex];
-          console.log(
-            "✅ Found user by existing username at index:",
-            userIndex
-          );
-        }
-      }
-
-      if (userIndex !== -1 && foundUser) {
-        // Update existing user completely
-        const updatedUser = { ...foundUser, ...updateData };
-        users[userIndex] = updatedUser;
-        console.log(`✅ Updated existing user at index ${userIndex}`);
-        console.log("🔄 Updated user data:", updatedUser);
-      } else {
-        // If user not found, add them
-        console.warn("⚠️ User not found in users array, adding them...");
-        console.log(
-          "🔍 All users in array:",
-          users.map((u) => ({ id: u.id, email: u.email, username: u.username }))
-        );
-
-        const newUser = { ...updatedCurrentUser };
-        users.push(newUser);
-        userIndex = users.length - 1;
-        console.log("✅ Added user to users array at index:", userIndex);
-      }
-
-      // Save updated users array with comprehensive error handling
-      try {
-        const usersJson = JSON.stringify(users);
-        localStorage.setItem("users", usersJson);
-        console.log("💾 Saved users array with", users.length, "users");
-        console.log("💾 Saved data size:", usersJson.length, "characters");
-      } catch (storageError) {
-        console.error("❌ Failed to save users array:", storageError);
-        console.error("❌ Storage error details:", storageError.message);
-
-        // Try to clean up localStorage and retry
-        try {
-          // Remove non-essential data and retry
-          const essentialUsers = users.map((u) => ({
-            id: u.id,
-            email: u.email,
-            password: u.password,
-            name: u.name,
-            username: u.username,
-            displayName: u.displayName,
-            bio: u.bio,
-            theme: u.theme,
-            isPro: u.isPro,
-            onboardingCompleted: u.onboardingCompleted,
-            createdAt: u.createdAt,
-            updatedAt: u.updatedAt,
-          }));
-
-          localStorage.setItem("users", JSON.stringify(essentialUsers));
-          console.log("✅ Saved essential users data successfully");
-        } catch (retryError) {
-          console.error("❌ Retry also failed:", retryError);
-          throw new Error(
-            "Failed to save profile data. Storage might be full."
-          );
-        }
-      }
-
-      // COMPREHENSIVE VERIFICATION
-      console.log("🔍 Starting verification process...");
-
-      try {
-        const verifyUsers = JSON.parse(localStorage.getItem("users") || "[]");
-        const verifyUser = verifyUsers.find(
-          (u) => u.username === profileData.username
-        );
-
-        if (verifyUser) {
-          console.log("✅ VERIFICATION SUCCESSFUL");
-          console.log("👤 Found user with username:", verifyUser.username);
-          console.log(
-            "🎯 Onboarding completed:",
-            verifyUser.onboardingCompleted
-          );
-          console.log("💎 Pro status:", verifyUser.isPro);
-          console.log("🎨 Theme:", verifyUser.theme);
-          console.log("📧 Email:", verifyUser.email);
-          console.log("🆔 ID:", verifyUser.id);
-        } else {
-          console.error("❌ VERIFICATION FAILED - User not found after save");
-          console.log("🔍 Looking for username:", profileData.username);
-          console.log(
-            "📋 Available usernames:",
-            verifyUsers.map((u) => u.username).filter(Boolean)
-          );
-
-          // Try to fix by finding and updating the user again
-          const userByEmail = verifyUsers.find(
-            (u) => u.email === currentUser.email
-          );
-          if (userByEmail) {
-            console.log("🔧 Found user by email, updating username...");
-            userByEmail.username = profileData.username;
-            userByEmail.onboardingCompleted = true;
-            userByEmail.isPro = profileData.isPro;
-            localStorage.setItem("users", JSON.stringify(verifyUsers));
-            console.log("✅ Fixed user data");
-          }
-        }
-      } catch (verifyError) {
-        console.error("❌ Verification process failed:", verifyError);
-      }
-
-      // Update auth context
-      if (updateUser && typeof updateUser === "function") {
-        try {
-          updateUser(updateData);
-          console.log("✅ Updated auth context");
-        } catch (contextError) {
-          console.error("❌ Failed to update auth context:", contextError);
-        }
-      }
-
-      // Save initial links
-      const enabledLinks = initialLinks.filter(
-        (link) => link.enabled && link.url.trim()
-      );
-
-      if (enabledLinks.length > 0) {
-        try {
-          const userLinksKey = `links_${currentUser.id || currentUser.email}`;
-          const linksToSave = enabledLinks.map((link, index) => ({
-            id: Date.now() + index,
-            userId: currentUser.id || currentUser.email,
-            title: link.title,
-            url: link.url,
-            type: link.type,
-            description: `My ${link.title} profile`,
-            clicks: 0,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-          }));
-
-          localStorage.setItem(userLinksKey, JSON.stringify(linksToSave));
-          console.log(
-            `✅ Saved ${linksToSave.length} initial links to ${userLinksKey}`
-          );
-        } catch (linksError) {
-          console.error("❌ Failed to save links:", linksError);
-          // Don't fail the whole process for this
-        }
-      }
-
-      console.log("🎉 Onboarding completed successfully!");
-      console.log(
-        "🔗 Profile should be available at: /profile/" + profileData.username
-      );
-
-      // Final verification before navigation
-      const finalUser = JSON.parse(localStorage.getItem("user") || "{}");
-      console.log("🏁 Final user state:", {
-        username: finalUser.username,
-        onboardingCompleted: finalUser.onboardingCompleted,
-        isPro: finalUser.isPro,
-      });
-
-      navigate("/dashboard?welcome=true");
-    } catch (error) {
-      console.error("❌ Error completing onboarding:", error);
-      console.error("❌ Error stack:", error.stack);
-
-      setError(
-        error.message ||
-          "Setup completed but with some limitations. You can continue to dashboard."
-      );
-
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 3000);
+      currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    } catch (e) {
+      console.error("Failed to parse current user");
+      throw new Error("Session error. Please login again.");
     }
-  };
+
+    console.log("👤 Current user before update:", currentUser);
+
+    if (!currentUser.id && !currentUser.email) {
+      throw new Error("No current user found. Please login again.");
+    }
+
+    // Update current user in localStorage
+    const updatedCurrentUser = { ...currentUser, ...updateData };
+
+    try {
+      localStorage.setItem("user", JSON.stringify(updatedCurrentUser));
+      console.log("✅ Updated current user in localStorage:", updatedCurrentUser);
+    } catch (storageError) {
+      console.error("❌ Failed to update current user:", storageError);
+      throw new Error("Failed to save user session. Please try again.");
+    }
+
+    // CRITICAL: Update users array with comprehensive error handling
+    let users = [];
+    try {
+      const usersData = localStorage.getItem("users");
+      console.log("📊 Raw users data from localStorage:", usersData);
+      users = JSON.parse(usersData || "[]");
+    } catch (e) {
+      console.warn("Invalid users data, starting fresh:", e);
+      users = [];
+    }
+
+    console.log("📊 Users array before update:", users.length, "users");
+    console.log("🔍 Looking for user with ID:", currentUser.id, "or email:", currentUser.email);
+
+    // Find user with multiple fallback methods
+    let userIndex = -1;
+    let foundUser = null;
+
+    // Method 1: Find by ID
+    if (currentUser.id) {
+      userIndex = users.findIndex((u) => u.id === currentUser.id);
+      if (userIndex !== -1) {
+        foundUser = users[userIndex];
+        console.log("✅ Found user by ID at index:", userIndex);
+      }
+    }
+
+    // Method 2: Find by email (case-insensitive)
+    if (userIndex === -1 && currentUser.email) {
+      userIndex = users.findIndex(
+        (u) => u.email && u.email.toLowerCase() === currentUser.email.toLowerCase()
+      );
+      if (userIndex !== -1) {
+        foundUser = users[userIndex];
+        console.log("✅ Found user by email at index:", userIndex);
+      }
+    }
+
+    if (userIndex !== -1 && foundUser) {
+      // Update existing user completely
+      const updatedUser = { ...foundUser, ...updateData };
+      users[userIndex] = updatedUser;
+      console.log(`✅ Updated existing user at index ${userIndex}`);
+      console.log("🔄 Updated user data:", updatedUser);
+    } else {
+      // CRITICAL FIX: If user not found, add them with password
+      console.warn("⚠️ User not found in users array, adding them...");
+      console.log("🔍 All users in array:", users.map((u) => ({ id: u.id, email: u.email, username: u.username })));
+
+      // IMPORTANT: For API users, we need to prompt for password or use a default
+      // Since we don't have the password, we'll create a special marker
+      const newUser = { 
+        ...updatedCurrentUser,
+        // CRITICAL: Add password field - we need to handle this
+        password: null, // Mark as needs password reset
+        needsPasswordReset: true, // Flag for password reset
+        registeredViaAPI: true // Mark as API registration
+      };
+      
+      users.push(newUser);
+      userIndex = users.length - 1;
+      console.log("✅ Added user to users array at index:", userIndex);
+      console.log("⚠️ User needs password reset due to API registration");
+    }
+
+    // Save updated users array with comprehensive error handling
+    try {
+      const usersJson = JSON.stringify(users);
+      localStorage.setItem("users", usersJson);
+      console.log("💾 Saved users array with", users.length, "users");
+    } catch (storageError) {
+      console.error("❌ Failed to save users array:", storageError);
+      throw new Error("Failed to save profile data. Storage might be full.");
+    }
+
+    // Verification and rest of function stays the same...
+    console.log("🔍 Starting verification process...");
+
+    try {
+      const verifyUsers = JSON.parse(localStorage.getItem("users") || "[]");
+      const verifyUser = verifyUsers.find((u) => u.username === profileData.username);
+
+      if (verifyUser) {
+        console.log("✅ VERIFICATION SUCCESSFUL");
+        console.log("👤 Found user with username:", verifyUser.username);
+        console.log("🎯 Onboarding completed:", verifyUser.onboardingCompleted);
+        console.log("💎 Pro status:", verifyUser.isPro);
+        console.log("🔑 Has password:", !!verifyUser.password);
+        console.log("⚠️ Needs password reset:", verifyUser.needsPasswordReset);
+      } else {
+        console.error("❌ VERIFICATION FAILED - User not found after save");
+      }
+    } catch (verifyError) {
+      console.error("❌ Verification process failed:", verifyError);
+    }
+
+    // Update auth context
+    if (updateUser && typeof updateUser === "function") {
+      try {
+        updateUser(updateData);
+        console.log("✅ Updated auth context");
+      } catch (contextError) {
+        console.error("❌ Failed to update auth context:", contextError);
+      }
+    }
+
+    // Save initial links
+    const enabledLinks = initialLinks.filter((link) => link.enabled && link.url.trim());
+
+    if (enabledLinks.length > 0) {
+      try {
+        const userLinksKey = `links_${currentUser.id || currentUser.email}`;
+        const linksToSave = enabledLinks.map((link, index) => ({
+          id: Date.now() + index,
+          userId: currentUser.id || currentUser.email,
+          title: link.title,
+          url: link.url,
+          type: link.type,
+          description: `My ${link.title} profile`,
+          clicks: 0,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        }));
+
+        localStorage.setItem(userLinksKey, JSON.stringify(linksToSave));
+        console.log(`✅ Saved ${linksToSave.length} initial links to ${userLinksKey}`);
+      } catch (linksError) {
+        console.error("❌ Failed to save links:", linksError);
+      }
+    }
+
+    console.log("🎉 Onboarding completed successfully!");
+    console.log("🔗 Profile should be available at: /profile/" + profileData.username);
+
+    // Final verification before navigation
+    const finalUser = JSON.parse(localStorage.getItem("user") || "{}");
+    console.log("🏁 Final user state:", {
+      username: finalUser.username,
+      onboardingCompleted: finalUser.onboardingCompleted,
+      isPro: finalUser.isPro,
+    });
+
+    navigate("/dashboard?welcome=true");
+  } catch (error) {
+    console.error("❌ Error completing onboarding:", error);
+    setError(error.message || "Setup completed but with some limitations. You can continue to dashboard.");
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 3000);
+  }
+};
 
   const renderStep1 = () => (
     <div className="space-y-6">

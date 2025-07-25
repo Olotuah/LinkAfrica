@@ -84,12 +84,11 @@ export const AuthProvider = ({ children }) => {
       console.log("🔐 Starting login for:", email);
       console.log("🔐 Password length:", password?.length);
 
-      // CRITICAL: Check localStorage FIRST before trying API
+      // Check localStorage FIRST
       let users = [];
       try {
         users = JSON.parse(localStorage.getItem("users") || "[]");
       } catch (e) {
-        console.error("Failed to parse users array:", e);
         users = [];
       }
 
@@ -105,64 +104,57 @@ export const AuthProvider = ({ children }) => {
 
       if (foundLocalUser) {
         console.log("👤 User found in localStorage:", foundLocalUser.email);
-        console.log("📊 Complete localStorage user data:");
-        console.log("  - Username:", foundLocalUser.username);
-        console.log(
-          "  - Onboarding completed:",
-          foundLocalUser.onboardingCompleted
-        );
-        console.log("  - Pro status:", foundLocalUser.isPro);
-        console.log("  - Theme:", foundLocalUser.theme);
-
-        // CRITICAL: Debug password comparison
         console.log("🔑 Password comparison:");
         console.log("  - Stored password:", foundLocalUser.password);
         console.log("  - Entered password:", password);
+        console.log("  - Has password:", !!foundLocalUser.password);
         console.log(
-          "  - Passwords match:",
-          foundLocalUser.password === password
+          "  - Needs password reset:",
+          foundLocalUser.needsPasswordReset
         );
-        console.log(
-          "  - Stored password type:",
-          typeof foundLocalUser.password
-        );
-        console.log("  - Entered password type:", typeof password);
+
+        // Handle users who need password reset (API registrations)
+        if (!foundLocalUser.password || foundLocalUser.needsPasswordReset) {
+          console.log("🔧 User needs password reset - updating password");
+
+          // Update the user's password in localStorage
+          const userIndex = users.findIndex(
+            (u) => u.email === foundLocalUser.email
+          );
+          if (userIndex !== -1) {
+            users[userIndex].password = password;
+            users[userIndex].needsPasswordReset = false;
+            delete users[userIndex].registeredViaAPI;
+
+            localStorage.setItem("users", JSON.stringify(users));
+            console.log("✅ Password updated for user");
+
+            // Update foundLocalUser for the login process
+            foundLocalUser.password = password;
+            foundLocalUser.needsPasswordReset = false;
+          }
+        }
 
         if (foundLocalUser.password === password) {
           console.log("✅ Password match confirmed");
 
-          // Force localStorage mode with mock token
           const token = "mock_token_" + Date.now();
-
-          // Use COMPLETE user data from localStorage
           const completeUserData = { ...foundLocalUser };
 
-          console.log("💾 Setting session with COMPLETE localStorage data");
           localStorage.setItem("token", token);
           localStorage.setItem("user", JSON.stringify(completeUserData));
           setUser(completeUserData);
           setIsAuthenticated(true);
 
-          console.log("✅ localStorage login successful - NO API CALLS");
+          console.log("✅ localStorage login successful");
           return { success: true, user: completeUserData };
         } else {
-          console.error("❌ Password mismatch detected");
-          console.error("  - This suggests a data corruption issue");
-
-          // Additional debugging - check if password was somehow modified
-          const originalUsers = JSON.parse(
-            localStorage.getItem("users") || "[]"
-          );
-          const originalUser = originalUsers.find(
-            (u) => u.email === foundLocalUser.email
-          );
-          console.log("🔍 Original user password:", originalUser?.password);
-
+          console.error("❌ Password mismatch");
           return { success: false, error: "Incorrect password" };
         }
       }
 
-      // Only try API if user not found in localStorage
+      // Try API if user not in localStorage
       console.log("🌐 User not in localStorage, trying API...");
       try {
         const response = await authAPI.login({ email, password });
@@ -177,7 +169,6 @@ export const AuthProvider = ({ children }) => {
         return { success: true, user: userData };
       } catch (apiError) {
         console.log("❌ API login failed and user not in localStorage");
-        console.log("API Error:", apiError.message);
         return { success: false, error: "No account found with this email" };
       }
     } catch (error) {
