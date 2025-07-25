@@ -380,29 +380,23 @@ export const AuthProvider = ({ children }) => {
 
   // Replace your logout function with this:
   const logout = () => {
-    console.log("👋 Logging out user...");
+  console.log("👋 Logging out user...");
+  
+  // Clear only session-related data
+  localStorage.removeItem("token");
+  localStorage.removeItem("links");
+  localStorage.removeItem("analytics");
 
-    // Only clear session data, NOT user accounts
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("links");
-    localStorage.removeItem("analytics");
+  // Do not clear user data (keep onboarding data intact)
+  // localStorage.removeItem("user");
 
-    // Clear product-specific data
-    const allKeys = Object.keys(localStorage);
-    allKeys.forEach((key) => {
-      if (key.startsWith("products_")) {
-        localStorage.removeItem(key);
-      }
-    });
+  // Reset auth state
+  setUser(null);
+  setIsAuthenticated(false);
 
-    // Reset auth state
-    setUser(null);
-    setIsAuthenticated(false);
+  console.log("✅ Session cleared successfully");
+};
 
-    console.log("✅ Session cleared successfully");
-    // NOTE: Users array is preserved for future logins
-  };
 
   const refreshUser = async () => {
     try {
