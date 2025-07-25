@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Share,
   Heart,
+  Briefcase,
 } from "lucide-react";
 
 const UserProfile = () => {
@@ -36,6 +37,24 @@ const UserProfile = () => {
   if (username === "nelsoncretes") {
     return <NelsonCreatesProfile />;
   }
+
+  // FIXED: Consistent key generation function (matches Dashboard)
+  const getUserKey = (user, prefix = "") => {
+    // ALWAYS use email as the primary identifier for consistency
+    // Never use ID to avoid key mismatches
+    const identifier = user?.email;
+    
+    if (!identifier) {
+      console.error("❌ No email found for user key generation:", user);
+      return null;
+    }
+    
+    const key = prefix ? `${prefix}_${identifier}` : identifier;
+    
+    console.log(`🔑 Generated key: "${key}" from user email: ${user?.email}`);
+    
+    return key;
+  };
 
   useEffect(() => {
     loadUserProfile();
@@ -72,8 +91,8 @@ const UserProfile = () => {
         );
         setUser(foundUser);
 
-        // Load user's links from correct localStorage key
-        const userLinksKey = `links_${foundUser.id || foundUser.email}`;
+        // FIXED: Use consistent key generation for links
+        const userLinksKey = getUserKey(foundUser, "links");
         const userLinksData = JSON.parse(
           localStorage.getItem(userLinksKey) || "[]"
         );
@@ -84,12 +103,15 @@ const UserProfile = () => {
         );
         setUserLinks(userLinksData.filter((link) => link.isActive));
 
-        // Load user's products
-        const userProductsKey = `products_${foundUser.id || foundUser.email}`;
+        // FIXED: Use consistent key generation for products
+        const userProductsKey = getUserKey(foundUser, "products");
         const products = JSON.parse(
           localStorage.getItem(userProductsKey) || "[]"
         );
         setUserProducts(products);
+
+        console.log(`📦 Loading products for ${userProductsKey}:`, products.length, "products");
+        console.log("🛍️ Products data:", products);
 
         console.log(`✅ Profile loaded successfully for ${username}`);
       } else {
@@ -124,8 +146,8 @@ const UserProfile = () => {
       );
       setUserLinks(updatedLinks);
 
-      // FIXED: Save to the correct user's localStorage
-      const userLinksKey = `links_${user.id || user.email}`;
+      // FIXED: Save to the correct user's localStorage using consistent key generation
+      const userLinksKey = getUserKey(user, "links");
       const allUserLinks = JSON.parse(
         localStorage.getItem(userLinksKey) || "[]"
       );
@@ -134,8 +156,8 @@ const UserProfile = () => {
       );
       localStorage.setItem(userLinksKey, JSON.stringify(updatedAllLinks));
 
-      // FIXED: Update user's stats
-      const userStatsKey = `stats_${user.id || user.email}`;
+      // FIXED: Update user's stats using consistent key generation  
+      const userStatsKey = getUserKey(user, "stats");
       const currentStats = JSON.parse(
         localStorage.getItem(userStatsKey) || "{}"
       );
@@ -164,7 +186,8 @@ const UserProfile = () => {
   // Add profile view tracking when someone visits the profile
   useEffect(() => {
     if (user && !loading && !error) {
-      const userStatsKey = `stats_${user.id || user.email}`;
+      // FIXED: Use consistent key generation for stats
+      const userStatsKey = getUserKey(user, "stats");
       const currentStats = JSON.parse(
         localStorage.getItem(userStatsKey) || "{}"
       );
@@ -248,6 +271,18 @@ const UserProfile = () => {
       "from-pink-500 to-rose-500",
     ];
     return colors[index % colors.length];
+  };
+
+  // FIXED: Add product type icons (matches Dashboard)
+  const getProductTypeIcon = (type) => {
+    const icons = {
+      ebook: <BookOpen className="w-5 h-5 text-green-600" />,
+      course: <Headphones className="w-5 h-5 text-green-600" />,
+      service: <Briefcase className="w-5 h-5 text-green-600" />,
+      template: <Globe className="w-5 h-5 text-green-600" />,
+      other: <DollarSign className="w-5 h-5 text-green-600" />,
+    };
+    return icons[type] || <DollarSign className="w-5 h-5 text-green-600" />;
   };
 
   if (loading) {
@@ -347,10 +382,16 @@ const UserProfile = () => {
               <span>🔗</span>
               <span>{userLinks.length} links</span>
             </div>
+            {userProducts.length > 0 && (
+              <div className="flex items-center space-x-1">
+                <span>🛍️</span>
+                <span>{userProducts.length} products</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Products Section */}
+        {/* Products Section - FIXED: Now properly displays products */}
         {userProducts.length > 0 && (
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -366,15 +407,7 @@ const UserProfile = () => {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      {product.type === "ebook" ? (
-                        <BookOpen className="w-5 h-5 text-green-600" />
-                      ) : product.type === "course" ? (
-                        <Headphones className="w-5 h-5 text-green-600" />
-                      ) : product.type === "service" ? (
-                        <Users className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <DollarSign className="w-5 h-5 text-green-600" />
-                      )}
+                      {getProductTypeIcon(product.type)}
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 mb-1">
