@@ -292,27 +292,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    console.log("👋 Logging out...");
+  console.log("👋 Logging out...");
 
-    // Clear session only
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("links");
-    localStorage.removeItem("analytics");
+  // Clear session only - preserve user data
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
 
-    // Clear product data
-    const allKeys = Object.keys(localStorage);
-    allKeys.forEach((key) => {
-      if (key.startsWith("products_")) {
-        localStorage.removeItem(key);
-      }
-    });
+  setUser(null);
+  setIsAuthenticated(false);
 
-    setUser(null);
-    setIsAuthenticated(false);
-
-    console.log("✅ Session cleared - users array preserved");
-  };
+  console.log("✅ Session cleared - user data preserved");
+};
 
   const clearAllData = () => {
     console.log("🧹 Clearing ALL data including users...");
