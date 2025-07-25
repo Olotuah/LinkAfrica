@@ -82,14 +82,22 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       console.log("🔐 Starting login for:", email);
+      console.log("🔐 Password length:", password?.length);
 
       // CRITICAL: Check localStorage FIRST before trying API
       let users = [];
       try {
         users = JSON.parse(localStorage.getItem("users") || "[]");
       } catch (e) {
+        console.error("Failed to parse users array:", e);
         users = [];
       }
+
+      console.log("🔍 Total users in localStorage:", users.length);
+      console.log(
+        "🔍 All users emails:",
+        users.map((u) => u.email)
+      );
 
       const foundLocalUser = users.find(
         (u) => u.email && u.email.toLowerCase() === email.toLowerCase().trim()
@@ -106,7 +114,23 @@ export const AuthProvider = ({ children }) => {
         console.log("  - Pro status:", foundLocalUser.isPro);
         console.log("  - Theme:", foundLocalUser.theme);
 
+        // CRITICAL: Debug password comparison
+        console.log("🔑 Password comparison:");
+        console.log("  - Stored password:", foundLocalUser.password);
+        console.log("  - Entered password:", password);
+        console.log(
+          "  - Passwords match:",
+          foundLocalUser.password === password
+        );
+        console.log(
+          "  - Stored password type:",
+          typeof foundLocalUser.password
+        );
+        console.log("  - Entered password type:", typeof password);
+
         if (foundLocalUser.password === password) {
+          console.log("✅ Password match confirmed");
+
           // Force localStorage mode with mock token
           const token = "mock_token_" + Date.now();
 
@@ -122,6 +146,18 @@ export const AuthProvider = ({ children }) => {
           console.log("✅ localStorage login successful - NO API CALLS");
           return { success: true, user: completeUserData };
         } else {
+          console.error("❌ Password mismatch detected");
+          console.error("  - This suggests a data corruption issue");
+
+          // Additional debugging - check if password was somehow modified
+          const originalUsers = JSON.parse(
+            localStorage.getItem("users") || "[]"
+          );
+          const originalUser = originalUsers.find(
+            (u) => u.email === foundLocalUser.email
+          );
+          console.log("🔍 Original user password:", originalUser?.password);
+
           return { success: false, error: "Incorrect password" };
         }
       }
@@ -141,6 +177,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true, user: userData };
       } catch (apiError) {
         console.log("❌ API login failed and user not in localStorage");
+        console.log("API Error:", apiError.message);
         return { success: false, error: "No account found with this email" };
       }
     } catch (error) {
