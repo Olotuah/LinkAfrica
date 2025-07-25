@@ -56,8 +56,36 @@ const Dashboard = () => {
   const [error, setError] = useState("");
   const [editingLink, setEditingLink] = useState(null);
 
-  // Add this debug function to your Dashboard component, right after the imports:
+  const [newLink, setNewLink] = useState({
+    title: "",
+    url: "",
+    type: "social",
+    description: "",
+  });
 
+  const [newProduct, setNewProduct] = useState({
+    type: "ebook",
+    name: "",
+    price: "",
+    description: "",
+    paymentLink: "",
+  });
+
+  // FIXED: Create a consistent user key function
+  const getUserKey = (user, prefix = "") => {
+    // Always use email as the primary identifier for consistency
+    const identifier = user?.email || user?.id;
+    const key = prefix ? `${prefix}_${identifier}` : identifier;
+
+    console.log(`🔑 Generated key: "${key}" from user:`, {
+      email: user?.email,
+      id: user?.id,
+    });
+
+    return key;
+  };
+
+  // Debug function for products persistence
   const debugProductsPersistence = (user) => {
     console.log("🐛 === PRODUCTS DEBUG ===");
     console.log("Current user object:", {
@@ -99,21 +127,49 @@ const Dashboard = () => {
     console.log("🐛 === END DEBUG ===");
   };
 
-  // FIXED: Create a consistent user key function
-  const getUserKey = (user, prefix = "") => {
-    // Always use email as the primary identifier for consistency
-    const identifier = user?.email || user?.id;
-    const key = prefix ? `${prefix}_${identifier}` : identifier;
+  // Generate QR Code
+  const generateQRCode = () => {
+    const profileUrl = `${window.location.origin}/profile/${
+      user?.username || user?.email
+    }`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+      profileUrl
+    )}`;
 
-    console.log(`🔑 Generated key: "${key}" from user:`, {
-      email: user?.email,
-      id: user?.id,
-    });
-
-    return key;
+    const link = document.createElement("a");
+    link.href = qrUrl;
+    link.download = `${user?.username || user?.email}-qr-code.png`;
+    link.click();
   };
 
-  // FIXED loadDashboardData function - replace your existing one
+  // Check for welcome or upgrade flags
+  useEffect(() => {
+    if (searchParams.get("welcome") === "true") {
+      setShowWelcome(true);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("welcome");
+      navigate({ search: newSearchParams.toString() }, { replace: true });
+    }
+
+    if (searchParams.get("upgrade") === "pro") {
+      setShowUpgradePrompt(true);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("upgrade");
+      navigate({ search: newSearchParams.toString() }, { replace: true });
+    }
+  }, [searchParams, navigate]);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    loadDashboardData();
+  }, [isAuthenticated, navigate]);
+
+  // FIXED: Load dashboard data with consistent key generation
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
@@ -227,7 +283,64 @@ const Dashboard = () => {
     }
   };
 
-  // FIXED handleAddProduct function - replace your existing one
+  // Handle adding links
+  const handleAddLink = async () => {
+    if (!newLink.title || !newLink.url) {
+      setError("Please fill in title and URL");
+      return;
+    }
+
+    if (!user?.isPro && userLinks.length >= 3) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+
+    try {
+      setError("");
+      console.log("🔗 Adding new link for user:", user?.email);
+
+      try {
+        const response = await linksAPI.createLink(newLink);
+        setUserLinks([response.data.link, ...userLinks]);
+        console.log("✅ Link created via API");
+      } catch (apiError) {
+        const newLinkWithId = {
+          id: Date.now(),
+          ...newLink,
+          clicks: 0,
+          isActive: true,
+          userId: user?.id || user?.email,
+          createdAt: new Date().toISOString(),
+        };
+
+        const updatedLinks = [newLinkWithId, ...userLinks];
+        setUserLinks(updatedLinks);
+
+        // Save to user-specific localStorage key
+        const userLinksKey = getUserKey(user, "links");
+        localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
+
+        console.log(`✅ Link saved locally for user: ${userLinksKey}`);
+      }
+
+      setNewLink({ title: "", url: "", type: "social", description: "" });
+      setShowAddLinkModal(false);
+
+      // Update stats immediately
+      setStats((prev) => ({
+        ...prev,
+        totalLinks: prev.totalLinks + 1,
+        activeLinks: prev.activeLinks + 1,
+      }));
+
+      console.log("✅ Link added successfully");
+    } catch (error) {
+      console.error("❌ Error adding link:", error);
+      setError("Failed to add link");
+    }
+  };
+
+  // FIXED: Handle adding products with consistent key generation
   const handleAddProduct = async () => {
     if (!newProduct.name || !newProduct.price) {
       setError("Please fill in product name and price");
@@ -273,382 +386,6 @@ const Dashboard = () => {
     }
   };
 
-  // FIXED handleDeleteProduct function - replace your existing one
-  const handleDeleteProduct = (id) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
-
-    try {
-      const updatedProducts = userProducts.filter(
-        (product) => product.id !== id
-      );
-      setUserProducts(updatedProducts);
-
-      const userProductsKey = getUserKey(user, "products");
-      localStorage.setItem(userProductsKey, JSON.stringify(updatedProducts));
-
-      console.log("✅ Product deleted successfully");
-      console.log(`📦 Remaining products: ${updatedProducts.length}`);
-
-      // Debug after deleting
-      debugProductsPersistence(user);
-    } catch (error) {
-      console.error("❌ Error deleting product:", error);
-      setError("Failed to delete product");
-    }
-  };
-
-  // Add this temporary debug button to your JSX (in the products section):
-  // You can remove this after confirming the fix works
-
-  const DebugProductsButton = () => (
-    <button
-      onClick={() => debugProductsPersistence(user)}
-      className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 ml-2"
-    >
-      Debug Products
-    </button>
-  );
-
-  // Add <DebugProductsButton /> next to your "Add Product" button temporarily
-
-  // Add this component at the top of your Dashboard component, right after the imports
-
-  const DebugUserData = () => {
-    const { user } = useAuth();
-
-    const debugAuth = () => {
-      console.log("🚨 === AUTH DEBUG ===");
-      console.log("Current user from auth:", {
-        email: user?.email,
-        username: user?.username,
-        onboardingCompleted: user?.onboardingCompleted,
-        isPro: user?.isPro,
-        theme: user?.theme,
-        displayName: user?.displayName,
-      });
-
-      const sessionUser = JSON.parse(localStorage.getItem("user") || "{}");
-      console.log("Session user:", {
-        email: sessionUser?.email,
-        username: sessionUser?.username,
-        onboardingCompleted: sessionUser?.onboardingCompleted,
-        isPro: sessionUser?.isPro,
-        theme: sessionUser?.theme,
-      });
-
-      const users = JSON.parse(localStorage.getItem("users") || "[]");
-      const userInArray = users.find((u) => u.email === user?.email);
-      console.log("User in users array:", {
-        email: userInArray?.email,
-        username: userInArray?.username,
-        onboardingCompleted: userInArray?.onboardingCompleted,
-        isPro: userInArray?.isPro,
-        theme: userInArray?.theme,
-      });
-
-      const token = localStorage.getItem("token");
-      console.log(
-        "Token type:",
-        token?.startsWith("mock_token_") ? "Mock (localStorage)" : "Real API"
-      );
-
-      console.log("🚨 === END DEBUG ===");
-    };
-
-    // Add this JSX right after your error alert in the Dashboard return statement
-    return (
-      <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-red-800">🐛 Debug Auth Data</h3>
-            <p className="text-red-600 text-sm">
-              Auth: {user?.username || "No username"} | Onboarding:{" "}
-              {user?.onboardingCompleted ? "✅" : "❌"} | Pro:{" "}
-              {user?.isPro ? "✅" : "❌"}
-            </p>
-          </div>
-          <button
-            onClick={debugAuth}
-            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-          >
-            Debug Console
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Then add <DebugUserData /> right after your error alert in the Dashboard JSX
-
-  // Add this function in Dashboard.jsx:
-  const generateQRCode = () => {
-    const profileUrl = `${window.location.origin}/profile/${
-      user?.username || user?.email
-    }`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-      profileUrl
-    )}`;
-
-    // Create modal or download
-    const link = document.createElement("a");
-    link.href = qrUrl;
-    link.download = `${user?.username || user?.email}-qr-code.png`;
-    link.click();
-  };
-
-  const [newLink, setNewLink] = useState({
-    title: "",
-    url: "",
-    type: "social",
-    description: "",
-  });
-
-  const [newProduct, setNewProduct] = useState({
-    type: "ebook",
-    name: "",
-    price: "",
-    description: "",
-    paymentLink: "",
-  });
-
-  // Check for welcome or upgrade flags
-  useEffect(() => {
-    if (searchParams.get("welcome") === "true") {
-      setShowWelcome(true);
-      const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.delete("welcome");
-      navigate({ search: newSearchParams.toString() }, { replace: true });
-    }
-
-    if (searchParams.get("upgrade") === "pro") {
-      setShowUpgradePrompt(true);
-      const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.delete("upgrade");
-      navigate({ search: newSearchParams.toString() }, { replace: true });
-    }
-  }, [searchParams, navigate]);
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login");
-      return;
-    }
-
-    loadDashboardData();
-  }, [isAuthenticated, navigate]);
-
-  // Fixed loadDashboardData function - replace the existing one in your Dashboard component
-
-  const loadDashboardData = async () => {
-    try {
-      setIsLoading(true);
-      setError("");
-
-      console.log("📊 Loading dashboard data for user:", user?.email);
-
-      try {
-        const [linksResponse, statsResponse] = await Promise.all([
-          linksAPI.getLinks(),
-          analyticsAPI.getStats(30),
-        ]);
-
-        setUserLinks(linksResponse.data);
-        setStats({
-          ...statsResponse.data,
-          totalLinks: linksResponse.data.length,
-          activeLinks: linksResponse.data.filter((link) => link.isActive)
-            .length,
-        });
-
-        // FIXED: Load products consistently for both API and localStorage modes
-        const userProductsKey = `products_${user?.id || user?.email}`;
-        const savedProducts = JSON.parse(
-          localStorage.getItem(userProductsKey) || "[]"
-        );
-        setUserProducts(savedProducts);
-        console.log(
-          `📦 Products loaded from ${userProductsKey}:`,
-          savedProducts.length
-        );
-      } catch (apiError) {
-        console.log("⚠️ API not available, loading from localStorage...");
-
-        // Load user-specific data
-        const userLinksKey = `links_${user?.id || user?.email}`;
-        const userProductsKey = `products_${user?.id || user?.email}`;
-        const userStatsKey = `stats_${user?.id || user?.email}`;
-
-        const savedLinks = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
-        const savedProducts = JSON.parse(
-          localStorage.getItem(userProductsKey) || "[]"
-        );
-        const savedStats = JSON.parse(
-          localStorage.getItem(userStatsKey) || "{}"
-        );
-
-        console.log(`📦 Loading data:`);
-        console.log(`- Links (${userLinksKey}):`, savedLinks.length);
-        console.log(`- Products (${userProductsKey}):`, savedProducts.length);
-        console.log(`- Stats (${userStatsKey}):`, savedStats);
-
-        setUserLinks(savedLinks);
-        setUserProducts(savedProducts); // FIXED: This was missing the proper variable
-
-        // Calculate and persist stats properly
-        const totalClicks = savedLinks.reduce(
-          (sum, link) => sum + (link.clicks || 0),
-          0
-        );
-        const profileViews = savedStats.profileViews || 0;
-
-        // Update saved stats with calculated values
-        const updatedStats = {
-          totalClicks: totalClicks,
-          profileViews: profileViews,
-          monthlyGrowth: savedStats.monthlyGrowth || 0,
-          earnings: savedStats.earnings || 0,
-          conversionRate:
-            totalClicks > 0 && profileViews > 0
-              ? ((totalClicks / profileViews) * 100).toFixed(1)
-              : 0,
-          topLink:
-            savedLinks.length > 0
-              ? savedLinks.reduce(
-                  (top, link) =>
-                    (link.clicks || 0) > (top.clicks || 0) ? link : top,
-                  savedLinks[0]
-                ).title
-              : "None yet",
-          totalLinks: savedLinks.length,
-          activeLinks: savedLinks.filter((link) => link.isActive).length,
-        };
-
-        // Save updated stats back to localStorage
-        localStorage.setItem(
-          userStatsKey,
-          JSON.stringify({
-            profileViews: updatedStats.profileViews,
-            monthlyGrowth: updatedStats.monthlyGrowth,
-            earnings: updatedStats.earnings,
-            lastUpdated: new Date().toISOString(),
-          })
-        );
-
-        setStats(updatedStats);
-
-        console.log("✅ Dashboard data loaded from localStorage");
-        console.log("📊 Final stats:", updatedStats);
-        console.log("🛍️ Final products:", savedProducts);
-      }
-    } catch (error) {
-      console.error("❌ Error loading dashboard data:", error);
-      setError("Dashboard loaded with limited functionality");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAddLink = async () => {
-    if (!newLink.title || !newLink.url) {
-      setError("Please fill in title and URL");
-      return;
-    }
-
-    if (!user?.isPro && userLinks.length >= 3) {
-      setShowUpgradePrompt(true);
-      return;
-    }
-
-    try {
-      setError("");
-      console.log("🔗 Adding new link for user:", user?.email);
-
-      try {
-        const response = await linksAPI.createLink(newLink);
-        setUserLinks([response.data.link, ...userLinks]);
-        console.log("✅ Link created via API");
-      } catch (apiError) {
-        const newLinkWithId = {
-          id: Date.now(),
-          ...newLink,
-          clicks: 0,
-          isActive: true,
-          userId: user?.id || user?.email,
-          createdAt: new Date().toISOString(),
-        };
-
-        const updatedLinks = [newLinkWithId, ...userLinks];
-        setUserLinks(updatedLinks);
-
-        // Save to user-specific localStorage key
-        const userLinksKey = `links_${user?.id || user?.email}`;
-        localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
-
-        console.log(`✅ Link saved locally for user: ${userLinksKey}`);
-      }
-
-      setNewLink({ title: "", url: "", type: "social", description: "" });
-      setShowAddLinkModal(false);
-
-      // Update stats immediately
-      setStats((prev) => ({
-        ...prev,
-        totalLinks: prev.totalLinks + 1,
-        activeLinks: prev.activeLinks + 1,
-      }));
-
-      console.log("✅ Link added successfully");
-    } catch (error) {
-      console.error("❌ Error adding link:", error);
-      setError("Failed to add link");
-    }
-  };
-
-  // Handle adding products/services
-  const handleAddProduct = async () => {
-    if (!newProduct.name || !newProduct.price) {
-      setError("Please fill in product name and price");
-      return;
-    }
-
-    try {
-      setError("");
-      console.log("🛍️ Adding new product for user:", user?.email);
-
-      const productWithId = {
-        id: Date.now(),
-        ...newProduct,
-        userId: user?.id || user?.email,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Save to localStorage with user-specific key
-      const updatedProducts = [productWithId, ...userProducts];
-      setUserProducts(updatedProducts);
-
-      const userProductsKey = `products_${user?.id || user?.email}`;
-      localStorage.setItem(userProductsKey, JSON.stringify(updatedProducts));
-
-      // Clear form and close modal
-      setNewProduct({
-        type: "ebook",
-        name: "",
-        price: "",
-        description: "",
-        paymentLink: "",
-      });
-      setShowAddProductModal(false);
-
-      console.log(`✅ Product added successfully to ${userProductsKey}`);
-    } catch (error) {
-      console.error("❌ Error adding product:", error);
-      setError("Failed to add product");
-    }
-  };
-
   // Handle editing links
   const handleEditLink = (link) => {
     setEditingLink({ ...link });
@@ -676,7 +413,7 @@ const Dashboard = () => {
       setUserLinks(updatedLinks);
 
       // Save to localStorage
-      const userLinksKey = `links_${user?.id || user?.email}`;
+      const userLinksKey = getUserKey(user, "links");
       localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
 
       setEditingLink(null);
@@ -705,7 +442,7 @@ const Dashboard = () => {
       setUserLinks(updatedLinks);
 
       // Save to localStorage after deletion
-      const userLinksKey = `links_${user?.id || user?.email}`;
+      const userLinksKey = getUserKey(user, "links");
       localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
 
       setStats((prev) => ({
@@ -723,7 +460,7 @@ const Dashboard = () => {
     }
   };
 
-  // Handle deleting products
+  // FIXED: Handle deleting products with consistent key generation
   const handleDeleteProduct = (id) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
 
@@ -733,10 +470,14 @@ const Dashboard = () => {
       );
       setUserProducts(updatedProducts);
 
-      const userProductsKey = `products_${user?.id || user?.email}`;
+      const userProductsKey = getUserKey(user, "products");
       localStorage.setItem(userProductsKey, JSON.stringify(updatedProducts));
 
       console.log("✅ Product deleted successfully");
+      console.log(`📦 Remaining products: ${updatedProducts.length}`);
+
+      // Debug after deleting
+      debugProductsPersistence(user);
     } catch (error) {
       console.error("❌ Error deleting product:", error);
       setError("Failed to delete product");
@@ -760,7 +501,7 @@ const Dashboard = () => {
       setUserLinks(updatedLinks);
 
       // Save to localStorage
-      const userLinksKey = `links_${user?.id || user?.email}`;
+      const userLinksKey = getUserKey(user, "links");
       localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
 
       setStats((prev) => ({
@@ -776,7 +517,6 @@ const Dashboard = () => {
   };
 
   const copyProfileUrl = () => {
-    // CORRECT (uses current domain):
     const profileUrl = `${window.location.origin}/profile/${
       user?.username || user?.email || "yourprofile"
     }`;
@@ -799,6 +539,16 @@ const Dashboard = () => {
       );
     }, 2000);
   };
+
+  // Debug Products Button (temporary)
+  const DebugProductsButton = () => (
+    <button
+      onClick={() => debugProductsPersistence(user)}
+      className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 ml-2"
+    >
+      Debug Products
+    </button>
+  );
 
   const linkTypeIcons = {
     social: <Instagram className="w-4 h-4" />,
@@ -1224,6 +974,7 @@ const Dashboard = () => {
               Download QR code for your profile
             </p>
           </button>
+
           <button
             onClick={() => navigate("/analytics")}
             className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"
@@ -1232,20 +983,6 @@ const Dashboard = () => {
             <h3 className="font-semibold text-gray-900 mb-2">Analytics</h3>
             <p className="text-gray-600 text-sm">
               Track your link performance and engagement
-            </p>
-          </button>
-          <button
-            onClick={() => navigate("/pricing")}
-            className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"
-          >
-            <Crown className="w-8 h-8 text-orange-500 mb-3" />
-            <h3 className="font-semibold text-gray-900 mb-2">
-              {user?.isPro ? "Pro Features" : "Upgrade to Pro"}
-            </h3>
-            <p className="text-gray-600 text-sm">
-              {user?.isPro
-                ? "Manage your Pro subscription"
-                : "Unlock unlimited links and analytics"}
             </p>
           </button>
         </div>
@@ -1262,13 +999,16 @@ const Dashboard = () => {
                   Monetize your audience with e-books, courses, and services
                 </p>
               </div>
-              <button
-                onClick={() => setShowAddProductModal(true)}
-                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Product</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowAddProductModal(true)}
+                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Product</span>
+                </button>
+                <DebugProductsButton />
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -1350,7 +1090,7 @@ const Dashboard = () => {
 
         {/* Pro Features Preview for Free Users */}
         {!user?.isPro && (
-          <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-6 text-white">
+          <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-6 text-white mb-8">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold mb-2">
