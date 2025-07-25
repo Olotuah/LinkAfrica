@@ -56,6 +56,75 @@ const Dashboard = () => {
   const [error, setError] = useState("");
   const [editingLink, setEditingLink] = useState(null);
 
+  // Add this component at the top of your Dashboard component, right after the imports
+
+  const DebugUserData = () => {
+    const { user } = useAuth();
+
+    const debugAuth = () => {
+      console.log("🚨 === AUTH DEBUG ===");
+      console.log("Current user from auth:", {
+        email: user?.email,
+        username: user?.username,
+        onboardingCompleted: user?.onboardingCompleted,
+        isPro: user?.isPro,
+        theme: user?.theme,
+        displayName: user?.displayName,
+      });
+
+      const sessionUser = JSON.parse(localStorage.getItem("user") || "{}");
+      console.log("Session user:", {
+        email: sessionUser?.email,
+        username: sessionUser?.username,
+        onboardingCompleted: sessionUser?.onboardingCompleted,
+        isPro: sessionUser?.isPro,
+        theme: sessionUser?.theme,
+      });
+
+      const users = JSON.parse(localStorage.getItem("users") || "[]");
+      const userInArray = users.find((u) => u.email === user?.email);
+      console.log("User in users array:", {
+        email: userInArray?.email,
+        username: userInArray?.username,
+        onboardingCompleted: userInArray?.onboardingCompleted,
+        isPro: userInArray?.isPro,
+        theme: userInArray?.theme,
+      });
+
+      const token = localStorage.getItem("token");
+      console.log(
+        "Token type:",
+        token?.startsWith("mock_token_") ? "Mock (localStorage)" : "Real API"
+      );
+
+      console.log("🚨 === END DEBUG ===");
+    };
+
+    // Add this JSX right after your error alert in the Dashboard return statement
+    return (
+      <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-red-800">🐛 Debug Auth Data</h3>
+            <p className="text-red-600 text-sm">
+              Auth: {user?.username || "No username"} | Onboarding:{" "}
+              {user?.onboardingCompleted ? "✅" : "❌"} | Pro:{" "}
+              {user?.isPro ? "✅" : "❌"}
+            </p>
+          </div>
+          <button
+            onClick={debugAuth}
+            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+          >
+            Debug Console
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Then add <DebugUserData /> right after your error alert in the Dashboard JSX
+
   // Add this function in Dashboard.jsx:
   const generateQRCode = () => {
     const profileUrl = `${window.location.origin}/profile/${
