@@ -73,19 +73,55 @@ const Dashboard = () => {
 
   // FIXED: Create a consistent user key function
   const getUserKey = (user, prefix = "") => {
-    // Always use email as the primary identifier for consistency
-    const identifier = user?.email || user?.id;
+    // ALWAYS use email as the primary identifier for consistency
+    // Never use ID to avoid key mismatches
+    const identifier = user?.email;
+    
+    if (!identifier) {
+      console.error("❌ No email found for user key generation:", user);
+      return null;
+    }
+    
     const key = prefix ? `${prefix}_${identifier}` : identifier;
-
-    console.log(`🔑 Generated key: "${key}" from user:`, {
-      email: user?.email,
-      id: user?.id,
-    });
-
+    
+    console.log(`🔑 Generated key: "${key}" from user email: ${user?.email}`);
+    
     return key;
   };
 
-  // Debug function for products persistence
+  // Migration function to move data from old keys to new keys
+  const migrateUserData = (user) => {
+    if (!user?.email || !user?.id) return;
+
+    const oldKeys = {
+      links: `links_${user.id}`,
+      products: `products_${user.id}`,
+      stats: `stats_${user.id}`,
+    };
+
+    const newKeys = {
+      links: `links_${user.email}`,
+      products: `products_${user.email}`,
+      stats: `stats_${user.email}`,
+    };
+
+    console.log("🔄 Checking for data migration...");
+
+    Object.keys(oldKeys).forEach(dataType => {
+      const oldKey = oldKeys[dataType];
+      const newKey = newKeys[dataType];
+      
+      const oldData = localStorage.getItem(oldKey);
+      const newData = localStorage.getItem(newKey);
+      
+      // If old data exists but new data doesn't, migrate it
+      if (oldData && !newData) {
+        console.log(`📦 Migrating ${dataType} from ${oldKey} to ${newKey}`);
+        localStorage.setItem(newKey, oldData);
+        localStorage.removeItem(oldKey); // Remove old key
+      }
+    });
+  };
   const debugProductsPersistence = (user) => {
     console.log("🐛 === PRODUCTS DEBUG ===");
     console.log("Current user object:", {
@@ -176,7 +212,10 @@ const Dashboard = () => {
       setError("");
 
       console.log("📊 Loading dashboard data for user:", user?.email);
-
+      
+      // IMPORTANT: Migrate any old data before loading
+      migrateUserData(user);
+      
       // Debug the current state
       debugProductsPersistence(user);
 
@@ -204,6 +243,7 @@ const Dashboard = () => {
           `📦 Products loaded from ${userProductsKey}:`,
           savedProducts.length
         );
+
       } catch (apiError) {
         console.log("⚠️ API not available, loading from localStorage...");
 
@@ -377,9 +417,10 @@ const Dashboard = () => {
 
       console.log(`✅ Product added successfully to ${userProductsKey}`);
       console.log(`📦 Total products now: ${updatedProducts.length}`);
-
+      
       // Debug after adding
       debugProductsPersistence(user);
+      
     } catch (error) {
       console.error("❌ Error adding product:", error);
       setError("Failed to add product");
@@ -475,9 +516,10 @@ const Dashboard = () => {
 
       console.log("✅ Product deleted successfully");
       console.log(`📦 Remaining products: ${updatedProducts.length}`);
-
+      
       // Debug after deleting
       debugProductsPersistence(user);
+      
     } catch (error) {
       console.error("❌ Error deleting product:", error);
       setError("Failed to delete product");
@@ -974,7 +1016,7 @@ const Dashboard = () => {
               Download QR code for your profile
             </p>
           </button>
-
+          
           <button
             onClick={() => navigate("/analytics")}
             className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"
