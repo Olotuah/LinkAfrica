@@ -22,34 +22,52 @@ export const AuthProvider = ({ children }) => {
 
   // Also fix your checkAuthStatus error handling:
   const checkAuthStatus = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const userData = localStorage.getItem("user");
+  try {
+    const token = localStorage.getItem("token");
+    const userData = localStorage.getItem("user");
 
-      if (token && userData) {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        setIsAuthenticated(true);
+    if (token && userData) {
+      const parsedUser = JSON.parse(userData);
+      console.log("🔍 Loading user from session:", {
+        username: parsedUser.username,
+        onboardingCompleted: parsedUser.onboardingCompleted,
+        isPro: parsedUser.isPro
+      });
+      
+      setUser(parsedUser);
+      setIsAuthenticated(true);
 
+      // Only try API verification if it's a real token (not mock)
+      if (!token.startsWith("mock_token_")) {
         try {
           const response = await authAPI.verifyToken();
           if (response.data.user) {
-            setUser(response.data.user);
-            localStorage.setItem("user", JSON.stringify(response.data.user));
+            // CRITICAL: Only update if API returns complete data
+            const apiUser = response.data.user;
+            if (apiUser.username && apiUser.onboardingCompleted !== undefined) {
+              console.log("✅ API returned complete user data, updating...");
+              setUser(apiUser);
+              localStorage.setItem("user", JSON.stringify(apiUser));
+            } else {
+              console.log("⚠️ API returned incomplete user data, keeping localStorage data");
+            }
           }
         } catch (error) {
-          console.log("Token verification failed:", error);
+          console.log("Token verification failed (expected for localStorage users):", error.message);
+          // Keep the localStorage user data - don't change anything
         }
+      } else {
+        console.log("📱 Mock token detected, using localStorage data only");
       }
-    } catch (error) {
-      console.error("Error checking auth status:", error);
-      // FIXED: Only clear session data, not user accounts
-      logout(); // This now calls the fixed logout function
-    } finally {
-      setLoading(false);
     }
-  };
-
+  } catch (error) {
+    console.error("Error checking auth status:", error);
+    // FIXED: Only clear session data, not user accounts
+    logout();
+  } finally {
+    setLoading(false);
+  }
+};
   const clearAllData = () => {
     console.log("🧹 Clearing ALL user data...");
     localStorage.removeItem("token");

@@ -17,26 +17,26 @@ import {
   Heart,
 } from "lucide-react";
 
-// Real Kemi Creates data - this would normally come from database
-const kemiData = {
-  id: "kemi-creates",
-  username: "kemicretes",
-  displayName: "Kemi Creates",
+// Real Nelson Creates data - this would normally come from database
+const nelsonData = {
+  id: "nelson-creates",
+  username: "nelsoncretes",
+  displayName: "Nelson Creates",
   bio: "Digital Marketing Expert 📱 | Content Creator 🎨 | Helping businesses grow online 🚀",
   theme: "purple",
   isPro: true,
   onboardingCompleted: true,
   profileViews: 2847,
   totalClicks: 1256,
-  avatar: "KC",
+  avatar: "NC",
   location: "Lagos, Nigeria",
   joined: "2024-01-15",
 
   links: [
     {
       id: 1,
-      title: "Instagram - @kemicretes",
-      url: "https://instagram.com/kemicretes",
+      title: "Instagram - @nelsoncretes",
+      url: "https://instagram.com/nelsoncretes",
       type: "social",
       icon: <Instagram className="w-5 h-5" />,
       clicks: 432,
@@ -46,7 +46,7 @@ const kemiData = {
     {
       id: 2,
       title: "YouTube Channel",
-      url: "https://youtube.com/@kemicretes",
+      url: "https://youtube.com/@nelsoncretes",
       type: "youtube",
       icon: <Youtube className="w-5 h-5" />,
       clicks: 287,
@@ -66,7 +66,7 @@ const kemiData = {
     {
       id: 4,
       title: "Portfolio Website",
-      url: "https://kemicretes.com",
+      url: "https://nelsoncretes.com",
       type: "website",
       icon: <Globe className="w-5 h-5" />,
       clicks: 156,
@@ -76,7 +76,7 @@ const kemiData = {
     {
       id: 5,
       title: "1-on-1 Consulting",
-      url: "https://calendly.com/kemicretes",
+      url: "https://calendly.com/nelsoncretes",
       type: "service",
       icon: <Users className="w-5 h-5" />,
       clicks: 89,
@@ -119,7 +119,7 @@ const kemiData = {
       price: 25000,
       description:
         "90-minute deep-dive session to create your brand strategy and content plan.",
-      paymentLink: "https://calendly.com/kemicretes/brand-strategy",
+      paymentLink: "https://calendly.com/nelsoncretes/brand-strategy",
       image: "🚀",
       sales: 156,
       rating: 5.0,
@@ -128,7 +128,7 @@ const kemiData = {
   ],
 };
 
-const KemiCreatesProfile = () => {
+const NelsonCreatesProfile = () => {
   const { username } = useParams();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -138,8 +138,8 @@ const KemiCreatesProfile = () => {
   useEffect(() => {
     // Simulate loading real user data
     setTimeout(() => {
-      if (username === "kemicretes") {
-        setUser(kemiData);
+      if (username === "nelsoncretes") {
+        setUser(nelsonData);
       } else {
         // For other usernames, you'd fetch from your API
         setUser(null);
@@ -148,9 +148,9 @@ const KemiCreatesProfile = () => {
     }, 500);
 
     // Track profile view
-    if (username === "kemicretes") {
+    if (username === "nelsoncretes") {
       // In a real app, you'd make an API call to increment view count
-      console.log("Profile view tracked for Kemi Creates");
+      console.log("Profile view tracked for Nelson Creates");
     }
   }, [username]);
 
@@ -231,7 +231,7 @@ const KemiCreatesProfile = () => {
     );
   }
 
-  const themeGradient = "from-purple-500 to-pink-500"; // Kemi's theme
+  const themeGradient = "from-purple-500 to-pink-500"; // Nelson's theme
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-50 to-purple-100">
@@ -447,4 +447,4 @@ const KemiCreatesProfile = () => {
   );
 };
 
-export default KemiCreatesProfile;
+export default NelsonCreatesProfile;
