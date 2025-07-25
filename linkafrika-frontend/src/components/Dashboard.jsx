@@ -183,108 +183,114 @@ const Dashboard = () => {
     loadDashboardData();
   }, [isAuthenticated, navigate]);
 
-  const loadDashboardData = async () => {
+  // Fixed loadDashboardData function - replace the existing one in your Dashboard component
+
+const loadDashboardData = async () => {
+  try {
+    setIsLoading(true);
+    setError("");
+
+    console.log("📊 Loading dashboard data for user:", user?.email);
+
     try {
-      setIsLoading(true);
-      setError("");
+      const [linksResponse, statsResponse] = await Promise.all([
+        linksAPI.getLinks(),
+        analyticsAPI.getStats(30),
+      ]);
 
-      console.log("📊 Loading dashboard data for user:", user?.email);
+      setUserLinks(linksResponse.data);
+      setStats({
+        ...statsResponse.data,
+        totalLinks: linksResponse.data.length,
+        activeLinks: linksResponse.data.filter((link) => link.isActive)
+          .length,
+      });
 
-      try {
-        const [linksResponse, statsResponse] = await Promise.all([
-          linksAPI.getLinks(),
-          analyticsAPI.getStats(30),
-        ]);
+      // FIXED: Load products consistently for both API and localStorage modes
+      const userProductsKey = `products_${user?.id || user?.email}`;
+      const savedProducts = JSON.parse(localStorage.getItem(userProductsKey) || "[]");
+      setUserProducts(savedProducts);
+      console.log(`📦 Products loaded from ${userProductsKey}:`, savedProducts.length);
 
-        setUserLinks(linksResponse.data);
-        setStats({
-          ...statsResponse.data,
-          totalLinks: linksResponse.data.length,
-          activeLinks: linksResponse.data.filter((link) => link.isActive)
-            .length,
-        });
+    } catch (apiError) {
+      console.log("⚠️ API not available, loading from localStorage...");
 
-        const userKey = `products_${user?.id || user?.email}`;
-        const savedProducts = JSON.parse(localStorage.getItem(userKey) || "[]");
-        setUserProducts(savedProducts);
-      } catch (apiError) {
-        console.log("⚠️ API not available, loading from localStorage...");
+      // Load user-specific data
+      const userLinksKey = `links_${user?.id || user?.email}`;
+      const userProductsKey = `products_${user?.id || user?.email}`;
+      const userStatsKey = `stats_${user?.id || user?.email}`;
 
-        // Load user-specific data
-        const userLinksKey = `links_${user?.id || user?.email}`;
-        const userProductsKey = `products_${user?.id || user?.email}`;
-        const userStatsKey = `stats_${user?.id || user?.email}`;
+      const savedLinks = JSON.parse(
+        localStorage.getItem(userLinksKey) || "[]"
+      );
+      const savedProducts = JSON.parse(
+        localStorage.getItem(userProductsKey) || "[]"
+      );
+      const savedStats = JSON.parse(
+        localStorage.getItem(userStatsKey) || "{}"
+      );
 
-        const savedLinks = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
-        const savedProducts = JSON.parse(
-          localStorage.getItem(userProductsKey) || "[]"
-        );
-        const savedStats = JSON.parse(
-          localStorage.getItem(userStatsKey) || "{}"
-        );
+      console.log(`📦 Loading data:`);
+      console.log(`- Links (${userLinksKey}):`, savedLinks.length);
+      console.log(`- Products (${userProductsKey}):`, savedProducts.length);
+      console.log(`- Stats (${userStatsKey}):`, savedStats);
 
-        console.log(`📦 Loading data:`);
-        console.log(`- Links (${userLinksKey}):`, savedLinks.length);
-        console.log(`- Products (${userProductsKey}):`, savedProducts.length);
-        console.log(`- Stats (${userStatsKey}):`, savedStats);
+      setUserLinks(savedLinks);
+      setUserProducts(savedProducts); // FIXED: This was missing the proper variable
+      
+      // Calculate and persist stats properly
+      const totalClicks = savedLinks.reduce(
+        (sum, link) => sum + (link.clicks || 0),
+        0
+      );
+      const profileViews = savedStats.profileViews || 0;
 
-        setUserLinks(savedLinks);
-        setUserProducts(savedProducts);
+      // Update saved stats with calculated values
+      const updatedStats = {
+        totalClicks: totalClicks,
+        profileViews: profileViews,
+        monthlyGrowth: savedStats.monthlyGrowth || 0,
+        earnings: savedStats.earnings || 0,
+        conversionRate:
+          totalClicks > 0 && profileViews > 0
+            ? ((totalClicks / profileViews) * 100).toFixed(1)
+            : 0,
+        topLink:
+          savedLinks.length > 0
+            ? savedLinks.reduce(
+                (top, link) =>
+                  (link.clicks || 0) > (top.clicks || 0) ? link : top,
+                savedLinks[0]
+              ).title
+            : "None yet",
+        totalLinks: savedLinks.length,
+        activeLinks: savedLinks.filter((link) => link.isActive).length,
+      };
 
-        // Calculate and persist stats properly
-        const totalClicks = savedLinks.reduce(
-          (sum, link) => sum + (link.clicks || 0),
-          0
-        );
-        const profileViews = savedStats.profileViews || 0;
+      // Save updated stats back to localStorage
+      localStorage.setItem(
+        userStatsKey,
+        JSON.stringify({
+          profileViews: updatedStats.profileViews,
+          monthlyGrowth: updatedStats.monthlyGrowth,
+          earnings: updatedStats.earnings,
+          lastUpdated: new Date().toISOString(),
+        })
+      );
 
-        // Update saved stats with calculated values
-        const updatedStats = {
-          totalClicks: totalClicks,
-          profileViews: profileViews,
-          monthlyGrowth: savedStats.monthlyGrowth || 0,
-          earnings: savedStats.earnings || 0,
-          conversionRate:
-            totalClicks > 0 && profileViews > 0
-              ? ((totalClicks / profileViews) * 100).toFixed(1)
-              : 0,
-          topLink:
-            savedLinks.length > 0
-              ? savedLinks.reduce(
-                  (top, link) =>
-                    (link.clicks || 0) > (top.clicks || 0) ? link : top,
-                  savedLinks[0]
-                ).title
-              : "None yet",
-          totalLinks: savedLinks.length,
-          activeLinks: savedLinks.filter((link) => link.isActive).length,
-        };
+      setStats(updatedStats);
 
-        // Save updated stats back to localStorage
-        localStorage.setItem(
-          userStatsKey,
-          JSON.stringify({
-            profileViews: updatedStats.profileViews,
-            monthlyGrowth: updatedStats.monthlyGrowth,
-            earnings: updatedStats.earnings,
-            lastUpdated: new Date().toISOString(),
-          })
-        );
-
-        setStats(updatedStats);
-
-        console.log("✅ Dashboard data loaded from localStorage");
-        console.log("📊 Final stats:", updatedStats);
-      }
-    } catch (error) {
-      console.error("❌ Error loading dashboard data:", error);
-      setError("Dashboard loaded with limited functionality");
-    } finally {
-      setIsLoading(false);
+      console.log("✅ Dashboard data loaded from localStorage");
+      console.log("📊 Final stats:", updatedStats);
+      console.log("🛍️ Final products:", savedProducts);
     }
-  };
+  } catch (error) {
+    console.error("❌ Error loading dashboard data:", error);
+    setError("Dashboard loaded with limited functionality");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleAddLink = async () => {
     if (!newLink.title || !newLink.url) {
