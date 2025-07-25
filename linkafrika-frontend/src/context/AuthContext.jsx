@@ -22,52 +22,76 @@ export const AuthProvider = ({ children }) => {
 
   // Also fix your checkAuthStatus error handling:
   const checkAuthStatus = async () => {
-  try {
-    const token = localStorage.getItem("token");
-    const userData = localStorage.getItem("user");
+    try {
+      const token = localStorage.getItem("token");
+      const userData = localStorage.getItem("user");
 
-    if (token && userData) {
-      const parsedUser = JSON.parse(userData);
-      console.log("🔍 Loading user from session:", {
-        username: parsedUser.username,
-        onboardingCompleted: parsedUser.onboardingCompleted,
-        isPro: parsedUser.isPro
-      });
-      
-      setUser(parsedUser);
-      setIsAuthenticated(true);
+      if (token && userData) {
+        const parsedUser = JSON.parse(userData);
+        console.log("🔍 Loading user from session:", {
+          username: parsedUser.username,
+          onboardingCompleted: parsedUser.onboardingCompleted,
+          isPro: parsedUser.isPro,
+        });
 
-      // Only try API verification if it's a real token (not mock)
-      if (!token.startsWith("mock_token_")) {
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+
+        // CRITICAL FIX: For localStorage users, skip API verification entirely
+        if (token.startsWith("mock_token_")) {
+          console.log(
+            "📱 Mock token detected - localStorage user, skipping API verification"
+          );
+          // Keep the localStorage data as-is, don't make any API calls
+          return;
+        }
+
+        // Only for real API tokens
         try {
           const response = await authAPI.verifyToken();
           if (response.data.user) {
-            // CRITICAL: Only update if API returns complete data
             const apiUser = response.data.user;
-            if (apiUser.username && apiUser.onboardingCompleted !== undefined) {
-              console.log("✅ API returned complete user data, updating...");
+            console.log("🔍 API user data:", apiUser);
+
+            // CRITICAL: Only update if API has MORE complete data than localStorage
+            const hasOnboardingData =
+              apiUser.username &&
+              apiUser.onboardingCompleted !== undefined &&
+              apiUser.theme &&
+              apiUser.displayName;
+
+            if (hasOnboardingData) {
+              console.log("✅ API has complete onboarding data, updating...");
               setUser(apiUser);
               localStorage.setItem("user", JSON.stringify(apiUser));
             } else {
-              console.log("⚠️ API returned incomplete user data, keeping localStorage data");
+              console.log(
+                "⚠️ API missing onboarding data, keeping localStorage version"
+              );
+              console.log("  - API username:", apiUser.username);
+              console.log(
+                "  - API onboardingCompleted:",
+                apiUser.onboardingCompleted
+              );
+              console.log("  - Local username:", parsedUser.username);
+              console.log(
+                "  - Local onboardingCompleted:",
+                parsedUser.onboardingCompleted
+              );
             }
           }
         } catch (error) {
-          console.log("Token verification failed (expected for localStorage users):", error.message);
-          // Keep the localStorage user data - don't change anything
+          console.log("Token verification failed:", error.message);
+          // Keep localStorage data - don't change anything
         }
-      } else {
-        console.log("📱 Mock token detected, using localStorage data only");
       }
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+      logout();
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Error checking auth status:", error);
-    // FIXED: Only clear session data, not user accounts
-    logout();
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   const clearAllData = () => {
     console.log("🧹 Clearing ALL user data...");
     localStorage.removeItem("token");
@@ -390,6 +414,63 @@ export const AuthProvider = ({ children }) => {
       console.error("Error refreshing user:", error);
       return { success: false, error: "Failed to refresh user data" };
     }
+  };
+
+  // Add this to your Dashboard component for debugging
+  const DebugOnboardingData = () => {
+    const { user } = useAuth();
+
+    const checkUsersArray = () => {
+      try {
+        const users = JSON.parse(localStorage.getItem("users") || "[]");
+        const currentUserEmail = user?.email;
+        const userInArray = users.find((u) => u.email === currentUserEmail);
+
+        console.log("🔍 ONBOARDING DEBUG:");
+        console.log("Current auth user:", {
+          email: user?.email,
+          username: user?.username,
+          onboardingCompleted: user?.onboardingCompleted,
+          isPro: user?.isPro,
+          theme: user?.theme,
+        });
+
+        console.log("User in users array:", {
+          email: userInArray?.email,
+          username: userInArray?.username,
+          onboardingCompleted: userInArray?.onboardingCompleted,
+          isPro: userInArray?.isPro,
+          theme: userInArray?.theme,
+        });
+
+        console.log(
+          "Session storage user:",
+          JSON.parse(localStorage.getItem("user") || "{}")
+        );
+        console.log("Token:", localStorage.getItem("token"));
+      } catch (error) {
+        console.error("Debug error:", error);
+      }
+    };
+
+    return (
+      <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-4">
+        <h3 className="font-bold text-red-800 mb-2">🐛 Onboarding Debug</h3>
+        <button
+          onClick={checkUsersArray}
+          className="bg-red-600 text-white px-3 py-1 rounded text-sm"
+        >
+          Check Onboarding Data
+        </button>
+        <div className="mt-2 text-sm text-red-700">
+          <p>
+            Auth User: {user?.username || "No username"} | Onboarding:{" "}
+            {user?.onboardingCompleted ? "✅" : "❌"} | Pro:{" "}
+            {user?.isPro ? "✅" : "❌"}
+          </p>
+        </div>
+      </div>
+    );
   };
 
   // FIXED: Better onboarding check
