@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import KemiCreatesProfile from "./KemiCreatesProfile";
+import KemiCreatesProfile from "./NelsonCreatesProfile";
+import NelsonCreatesProfile from "./NelsonCreatesProfile"; // Import the Nelson profile
 import {
   ExternalLink,
   Instagram,
@@ -26,9 +27,14 @@ const UserProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // If it's Kemi Creates, use the special component
+  // Handle special demo profiles
   if (username === "kemicretes") {
     return <KemiCreatesProfile />;
+  }
+  
+  // Add Nelson Creates demo profile
+  if (username === "nelsoncretes") {
+    return <NelsonCreatesProfile />;
   }
 
   useEffect(() => {
