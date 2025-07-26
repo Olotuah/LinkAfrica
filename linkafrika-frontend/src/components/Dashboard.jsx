@@ -76,16 +76,16 @@ const Dashboard = () => {
     // ALWAYS use email as the primary identifier for consistency
     // Never use ID to avoid key mismatches
     const identifier = user?.email;
-    
+
     if (!identifier) {
       console.error("❌ No email found for user key generation:", user);
       return null;
     }
-    
+
     const key = prefix ? `${prefix}_${identifier}` : identifier;
-    
+
     console.log(`🔑 Generated key: "${key}" from user email: ${user?.email}`);
-    
+
     return key;
   };
 
@@ -107,13 +107,13 @@ const Dashboard = () => {
 
     console.log("🔄 Checking for data migration...");
 
-    Object.keys(oldKeys).forEach(dataType => {
+    Object.keys(oldKeys).forEach((dataType) => {
       const oldKey = oldKeys[dataType];
       const newKey = newKeys[dataType];
-      
+
       const oldData = localStorage.getItem(oldKey);
       const newData = localStorage.getItem(newKey);
-      
+
       // If old data exists but new data doesn't, migrate it
       if (oldData && !newData) {
         console.log(`📦 Migrating ${dataType} from ${oldKey} to ${newKey}`);
@@ -212,10 +212,10 @@ const Dashboard = () => {
       setError("");
 
       console.log("📊 Loading dashboard data for user:", user?.email);
-      
+
       // IMPORTANT: Migrate any old data before loading
       migrateUserData(user);
-      
+
       // Debug the current state
       debugProductsPersistence(user);
 
@@ -243,7 +243,6 @@ const Dashboard = () => {
           `📦 Products loaded from ${userProductsKey}:`,
           savedProducts.length
         );
-
       } catch (apiError) {
         console.log("⚠️ API not available, loading from localStorage...");
 
@@ -417,10 +416,9 @@ const Dashboard = () => {
 
       console.log(`✅ Product added successfully to ${userProductsKey}`);
       console.log(`📦 Total products now: ${updatedProducts.length}`);
-      
+
       // Debug after adding
       debugProductsPersistence(user);
-      
     } catch (error) {
       console.error("❌ Error adding product:", error);
       setError("Failed to add product");
@@ -516,10 +514,9 @@ const Dashboard = () => {
 
       console.log("✅ Product deleted successfully");
       console.log(`📦 Remaining products: ${updatedProducts.length}`);
-      
+
       // Debug after deleting
       debugProductsPersistence(user);
-      
     } catch (error) {
       console.error("❌ Error deleting product:", error);
       setError("Failed to delete product");
@@ -581,16 +578,6 @@ const Dashboard = () => {
       );
     }, 2000);
   };
-
-  // Debug Products Button (temporary)
-  const DebugProductsButton = () => (
-    <button
-      onClick={() => debugProductsPersistence(user)}
-      className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 ml-2"
-    >
-      Debug Products
-    </button>
-  );
 
   const linkTypeIcons = {
     social: <Instagram className="w-4 h-4" />,
@@ -712,20 +699,20 @@ const Dashboard = () => {
         )}
 
         {/* User Welcome Section */}
-        <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-6 mb-8 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold mb-2">
+        <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-4 mb-8 text-white">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold mb-2 break-words">
                 Welcome back, {user?.name || user?.email || "User"}! 👋
               </h1>
-              <p className="opacity-90">
+              <p className="opacity-90 text-sm">
                 Manage your links and grow your online presence
               </p>
             </div>
 
-            <div className="text-right">
-              <div className="text-sm opacity-75">Your Profile</div>
-              <div className="font-medium">
+            <div className="lg:text-right min-w-0 lg:max-w-xs">
+              <div className="text-xs opacity-75 mb-1">Your Profile</div>
+              <div className="font-medium text-xs sm:text-sm break-all">
                 {window.location.host}/profile/
                 {user?.username || user?.email || "yourprofile"}
               </div>
@@ -862,11 +849,11 @@ const Dashboard = () => {
               {userLinks.map((link, index) => (
                 <div
                   key={link.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border"
+                  className="flex flex-col sm:flex-row sm:items-center p-3 bg-gray-50 rounded-lg border gap-3"
                 >
                   {editingLink && editingLink.id === link.id ? (
                     // EDIT MODE
-                    <div className="flex-1 grid grid-cols-3 gap-4">
+                    <div className="flex-1 space-y-3">
                       <input
                         type="text"
                         value={editingLink.title}
@@ -876,7 +863,7 @@ const Dashboard = () => {
                             title: e.target.value,
                           })
                         }
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                         placeholder="Link title"
                       />
                       <input
@@ -888,13 +875,13 @@ const Dashboard = () => {
                             url: e.target.value,
                           })
                         }
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                         placeholder="https://..."
                       />
-                      <div className="flex items-center space-x-2">
+                      <div className="flex gap-2">
                         <button
                           onClick={handleSaveEdit}
-                          className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-1"
+                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
                         >
                           <Save className="w-4 h-4" />
                           <span>Save</span>
@@ -908,42 +895,45 @@ const Dashboard = () => {
                       </div>
                     </div>
                   ) : (
-                    // VIEW MODE
+                    // VIEW MODE - FIXED
                     <>
-                      <div className="flex items-center space-x-4 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 text-gray-400">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="w-6 h-6 text-gray-400 flex-shrink-0">
                             {linkTypeIcons[link.type] || (
                               <Globe className="w-4 h-4" />
                             )}
                           </div>
-                          <span className="text-gray-600 text-sm">
+                          <span className="text-gray-600 text-sm flex-shrink-0">
                             #{index + 1}
                           </span>
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 truncate">
                             {link.title}
                           </h3>
-                          <p className="text-sm text-gray-500 truncate max-w-xs">
+                          <p className="text-sm text-gray-500 break-all text-xs leading-tight">
                             {link.url}
                           </p>
-                        </div>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500">
-                          <span>{link.clicks || 0} clicks</span>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs ${
-                              link.isActive
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {link.isActive ? "Active" : "Disabled"}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 mt-1">
+                            <span className="flex-shrink-0">
+                              {link.clicks || 0} clicks
+                            </span>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs flex-shrink-0 ${
+                                link.isActive
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {link.isActive ? "Active" : "Disabled"}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center gap-1 flex-shrink-0 sm:ml-auto">
                         <button
                           onClick={() => toggleLinkStatus(link.id)}
                           className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
@@ -1016,7 +1006,7 @@ const Dashboard = () => {
               Download QR code for your profile
             </p>
           </button>
-          
+
           <button
             onClick={() => navigate("/analytics")}
             className="bg-white rounded-xl shadow-sm border p-6 text-left hover:shadow-md transition-shadow"

@@ -201,23 +201,29 @@ const Analytics = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
+        {/* Header */}/ 2. ANALYTICS - Replace the entire Header section (second
+        most critical)
+        <div className="mb-8">
+          {/* Title Row */}
+          <div className="flex items-center space-x-4 mb-4">
             <button
               onClick={() => navigate("/dashboard")}
               className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to Dashboard</span>
+              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="sm:hidden">Back</span>
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-              <p className="text-gray-600">Track your performance and growth</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Analytics
+              </h1>
+              <p className="text-gray-600 text-sm">Track your performance</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          {/* Controls Row - Stack on mobile */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
@@ -228,24 +234,25 @@ const Analytics = () => {
               <option value="90">Last 90 days</option>
             </select>
 
-            <button
-              onClick={shareAnalytics}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share</span>
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={shareAnalytics}
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Share</span>
+              </button>
 
-            <button
-              onClick={exportData}
-              className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-            </button>
+              <button
+                onClick={exportData}
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+              </button>
+            </div>
           </div>
         </div>
-
         {/* Pro Upgrade Banner */}
         {!user?.isPro && (
           <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-6 mb-8 text-white">
@@ -287,7 +294,6 @@ const Analytics = () => {
             </div>
           </div>
         )}
-
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -354,7 +360,6 @@ const Analytics = () => {
             </div>
           </div>
         </div>
-
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Daily Activity Chart */}
@@ -493,7 +498,6 @@ const Analytics = () => {
             </div>
           </div>
         </div>
-
         {/* Insights and Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Performance Summary */}
@@ -660,7 +664,6 @@ const Analytics = () => {
             </div>
           </div>
         </div>
-
         {/* Bottom CTA */}
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white text-center">
           <h2 className="text-xl font-bold mb-2">Share Your Success! 🎉</h2>
