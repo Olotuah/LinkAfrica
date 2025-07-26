@@ -139,6 +139,173 @@ const UserProfile = () => {
     }
   };
 
+  // UNIVERSAL LINKS LOADER - Add this function to Analytics.jsx
+
+  const loadUserLinks = (user) => {
+    console.log("🔍 Searching for user links...");
+
+    // All possible key variations we might have used
+    const possibleKeys = [
+      `links_${user?.email}`,
+      `links_${user?.id}`,
+      `links_${user?.id || user?.email}`,
+      `links_${user?.email || user?.id}`,
+    ];
+
+    // Remove duplicates and undefined keys
+    const uniqueKeys = [...new Set(possibleKeys)].filter(
+      (key) => key && key !== "links_undefined" && key !== "links_null"
+    );
+
+    console.log("🔑 Checking keys:", uniqueKeys);
+
+    for (const key of uniqueKeys) {
+      const data = localStorage.getItem(key);
+      if (data && data !== "[]") {
+        try {
+          const links = JSON.parse(data);
+          if (links.length > 0) {
+            console.log(`✅ Found ${links.length} links with key: ${key}`);
+            return links;
+          }
+        } catch (error) {
+          console.log(`❌ Error parsing data for key ${key}:`, error);
+        }
+      }
+    }
+
+    console.log("❌ No links found for any key variation");
+    return [];
+  };
+
+  // REPLACE your loadAnalytics function with this BULLETPROOF version:
+
+  // In Analytics.jsx - REPLACE the loadAnalytics function with this FIXED version:
+
+  const loadAnalytics = async () => {
+    try {
+      setIsLoading(true);
+      console.log("📊 Loading analytics for user:", user?.email);
+
+      // Get analytics data
+      const analytics = await AnalyticsTracker.getAnalyticsData(
+        user?.id || user?.email,
+        parseInt(timeRange)
+      );
+
+      // FIXED: Load links using the same key format as Dashboard
+      const userLinksKey = `links_${user?.email}`; // Use email consistently
+      const savedLinks = JSON.parse(localStorage.getItem(userLinksKey) || "[]");
+
+      console.log(
+        `📦 Loading links from ${userLinksKey}:`,
+        savedLinks.length,
+        "links found"
+      );
+      console.log("🔗 Links data:", savedLinks);
+
+      // If no links found with email, try with ID as fallback
+      if (savedLinks.length === 0 && user?.id) {
+        const fallbackKey = `links_${user.id}`;
+        const fallbackLinks = JSON.parse(
+          localStorage.getItem(fallbackKey) || "[]"
+        );
+        console.log(
+          `📦 Fallback: Loading links from ${fallbackKey}:`,
+          fallbackLinks.length,
+          "links found"
+        );
+
+        if (fallbackLinks.length > 0) {
+          setLinks(fallbackLinks);
+        } else {
+          setLinks([]);
+        }
+      } else {
+        setLinks(savedLinks);
+      }
+
+      // Update analytics stats with actual link counts
+      const updatedAnalytics = {
+        ...analytics,
+        totalLinks: savedLinks.length,
+        activeLinks: savedLinks.filter((link) => link.isActive).length,
+      };
+
+      setStats(updatedAnalytics);
+
+      console.log("✅ Analytics loaded successfully");
+      console.log("📊 Final analytics:", updatedAnalytics);
+      console.log("🔗 Final links:", savedLinks.length);
+    } catch (error) {
+      console.error("❌ Error loading analytics:", error);
+      setStats(AnalyticsTracker.getEmptyAnalytics());
+      setLinks([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ADD THIS DEBUG BUTTON to your Analytics.jsx (temporarily for debugging)
+
+  const DebugLinksButton = () => (
+    <button
+      onClick={() => {
+        console.log("🐛 === LINKS DEBUG ===");
+        console.log("Current user:", {
+          id: user?.id,
+          email: user?.email,
+          username: user?.username,
+        });
+
+        // Check all possible link keys
+        const possibleKeys = [
+          `links_${user?.email}`,
+          `links_${user?.id}`,
+          `links_${user?.id || user?.email}`,
+          `links_${user?.email || user?.id}`,
+        ];
+
+        console.log("Checking all possible link keys:");
+        possibleKeys.forEach((key) => {
+          const data = localStorage.getItem(key);
+          if (data) {
+            const links = JSON.parse(data);
+            console.log(
+              `✅ Found links for key "${key}":`,
+              links.length,
+              "links"
+            );
+            console.log("Links preview:", links.slice(0, 2));
+          } else {
+            console.log(`❌ No data for key "${key}"`);
+          }
+        });
+
+        // Check current state
+        console.log("Current links state:", links);
+        console.log("Current stats state:", stats);
+
+        // Check ALL localStorage keys
+        console.log('ALL localStorage keys with "links":');
+        Object.keys(localStorage).forEach((key) => {
+          if (key.includes("links")) {
+            const data = JSON.parse(localStorage.getItem(key) || "[]");
+            console.log(`📦 ${key}: ${data.length} items`);
+          }
+        });
+
+        console.log("🐛 === END DEBUG ===");
+      }}
+      className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600"
+    >
+      Debug Links
+    </button>
+  );
+
+  // Add this button next to your Export and Share buttons in the header:
+  // <DebugLinksButton />
+
   const handleLinkClick = async (link) => {
     try {
       console.log(
