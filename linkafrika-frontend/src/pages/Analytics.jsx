@@ -46,6 +46,86 @@ const Analytics = () => {
     return key;
   };
 
+  // Add this temporary debug function right after getUserKey in your Analytics component
+
+  const debugLinkKeys = (user) => {
+    console.log("🔍 === ANALYTICS LINK DEBUG ===");
+    console.log("User object:", {
+      id: user?.id,
+      email: user?.email,
+      username: user?.username,
+    });
+
+    // Test key generation
+    const testKey = getUserKey(user, "links");
+    console.log("Generated key:", testKey);
+
+    // Check what's actually in localStorage
+    console.log("All localStorage keys containing 'links':");
+    Object.keys(localStorage).forEach((key) => {
+      if (key.includes("links")) {
+        const data = JSON.parse(localStorage.getItem(key) || "[]");
+        console.log(`📦 ${key}: ${data.length} links`);
+        if (data.length > 0) {
+          console.log("   Sample link:", data[0]);
+        }
+      }
+    });
+
+    // Try loading with the key we generated
+    if (testKey) {
+      const savedLinks = JSON.parse(localStorage.getItem(testKey) || "[]");
+      console.log(
+        `✅ Links found with generated key "${testKey}":`,
+        savedLinks.length
+      );
+    }
+
+    console.log("🔍 === END DEBUG ===");
+  };
+
+  // Then MODIFY your loadAnalytics function to call this debug:
+
+  const loadAnalytics = async () => {
+    try {
+      setIsLoading(true);
+      console.log("📊 Loading analytics for user:", user?.email);
+
+      // ADD THIS DEBUG CALL
+      debugLinkKeys(user);
+
+      const analytics = await AnalyticsTracker.getAnalyticsData(
+        user?.id || user?.email,
+        parseInt(timeRange)
+      );
+
+      setStats(analytics);
+
+      // FIXED: Load links using consistent key generation (same as Dashboard)
+      const userLinksKey = getUserKey(user, "links");
+      if (userLinksKey) {
+        const savedLinks = JSON.parse(
+          localStorage.getItem(userLinksKey) || "[]"
+        );
+        setLinks(savedLinks);
+        console.log(
+          `📦 Analytics links loaded from ${userLinksKey}:`,
+          savedLinks.length
+        );
+      } else {
+        console.error("❌ Could not generate user key for links");
+        setLinks([]);
+      }
+
+      console.log("✅ Analytics loaded");
+    } catch (error) {
+      console.error("❌ Error loading analytics:", error);
+      setStats(AnalyticsTracker.getEmptyAnalytics());
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Replace loadAnalytics function with:
   // FIXED loadAnalytics function
   const loadAnalytics = async () => {
