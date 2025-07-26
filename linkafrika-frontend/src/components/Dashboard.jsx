@@ -1039,7 +1039,6 @@ const Dashboard = () => {
                   <Plus className="w-4 h-4" />
                   <span>Add Product</span>
                 </button>
-                <DebugProductsButton />
               </div>
             </div>
 
