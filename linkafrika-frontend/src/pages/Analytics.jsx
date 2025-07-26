@@ -32,7 +32,22 @@ const Analytics = () => {
     loadAnalytics();
   }, [timeRange, user]);
 
+  // Add this at the top of your Analytics component, after the imports
+  const getUserKey = (user, prefix = "") => {
+    const identifier = user?.email;
+
+    if (!identifier) {
+      console.error("❌ No email found for user key generation:", user);
+      return null;
+    }
+
+    const key = prefix ? `${prefix}_${identifier}` : identifier;
+    console.log(`🔑 Generated key: "${key}" from user email: ${user?.email}`);
+    return key;
+  };
+
   // Replace loadAnalytics function with:
+  // FIXED loadAnalytics function
   const loadAnalytics = async () => {
     try {
       setIsLoading(true);
@@ -45,10 +60,21 @@ const Analytics = () => {
 
       setStats(analytics);
 
-      // Load links
-      const userLinksKey = `links_${user?.id || user?.email}`;
-      const savedLinks = JSON.parse(localStorage.getItem(userLinksKey) || "[]");
-      setLinks(savedLinks);
+      // FIXED: Load links using consistent key generation (same as Dashboard)
+      const userLinksKey = getUserKey(user, "links");
+      if (userLinksKey) {
+        const savedLinks = JSON.parse(
+          localStorage.getItem(userLinksKey) || "[]"
+        );
+        setLinks(savedLinks);
+        console.log(
+          `📦 Analytics links loaded from ${userLinksKey}:`,
+          savedLinks.length
+        );
+      } else {
+        console.error("❌ Could not generate user key for links");
+        setLinks([]);
+      }
 
       console.log("✅ Analytics loaded");
     } catch (error) {
