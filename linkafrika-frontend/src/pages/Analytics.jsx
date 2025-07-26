@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import AnalyticsTracker from "../utils/analytics";
 import { analyticsAPI, linksAPI } from "../utils/api";
 import {
   ArrowLeft,
@@ -31,113 +32,28 @@ const Analytics = () => {
     loadAnalytics();
   }, [timeRange, user]);
 
+  // Replace loadAnalytics function with:
   const loadAnalytics = async () => {
     try {
       setIsLoading(true);
       console.log("📊 Loading analytics for user:", user?.email);
 
-      // Try API first
-      try {
-        const [statsResponse, linksResponse] = await Promise.all([
-          analyticsAPI.getStats(timeRange),
-          linksAPI.getLinks(),
-        ]);
+      const analytics = await AnalyticsTracker.getAnalyticsData(
+        user?.id || user?.email,
+        parseInt(timeRange)
+      );
 
-        setStats(statsResponse.data);
-        setLinks(linksResponse.data);
-        console.log("✅ Analytics loaded from API");
-      } catch (error) {
-        console.log("⚠️ API not available, loading from localStorage...");
+      setStats(analytics);
 
-        // FIXED: Load from localStorage
-        const userLinksKey = `links_${user?.id || user?.email}`;
-        const userStatsKey = `stats_${user?.id || user?.email}`;
+      // Load links
+      const userLinksKey = `links_${user?.id || user?.email}`;
+      const savedLinks = JSON.parse(localStorage.getItem(userLinksKey) || "[]");
+      setLinks(savedLinks);
 
-        const savedLinks = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
-        const savedStats = JSON.parse(
-          localStorage.getItem(userStatsKey) || "{}"
-        );
-
-        console.log(`📊 Loading analytics data:`);
-        console.log(`- Links (${userLinksKey}):`, savedLinks.length);
-        console.log(`- Stats (${userStatsKey}):`, savedStats);
-
-        // Calculate real stats from saved data
-        const totalClicks = savedLinks.reduce(
-          (sum, link) => sum + (link.clicks || 0),
-          0
-        );
-        const profileViews = savedStats.profileViews || 0;
-        const activeLinks = savedLinks.filter((link) => link.isActive).length;
-
-        // Generate realistic daily stats for the time range
-        const dailyStats = [];
-        const days = parseInt(timeRange);
-
-        for (let i = days - 1; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-
-          // Distribute clicks across the time period more realistically
-          const baseClicks = Math.floor(totalClicks / days);
-          const baseViews = Math.floor(profileViews / days);
-
-          // Add some realistic variance
-          const clickVariance = Math.floor(
-            Math.random() * Math.max(3, baseClicks)
-          );
-          const viewVariance = Math.floor(
-            Math.random() * Math.max(5, baseViews)
-          );
-
-          dailyStats.push({
-            date: date.toISOString().split("T")[0],
-            clicks: Math.max(0, baseClicks + clickVariance - 1),
-            views: Math.max(0, baseViews + viewVariance - 2),
-          });
-        }
-
-        const calculatedStats = {
-          totalClicks: totalClicks,
-          profileViews: profileViews,
-          activeLinks: activeLinks,
-          totalLinks: savedLinks.length,
-          monthlyGrowth:
-            savedStats.monthlyGrowth ||
-            (totalClicks > 0 ? Math.floor(Math.random() * 20) + 5 : 0),
-          earnings: user?.isPro
-            ? savedStats.earnings || Math.floor(totalClicks * 0.5)
-            : 0,
-          conversionRate:
-            profileViews > 0
-              ? ((totalClicks / profileViews) * 100).toFixed(1)
-              : 0,
-          dailyStats: dailyStats,
-        };
-
-        setStats(calculatedStats);
-        setLinks(savedLinks);
-
-        console.log("✅ Analytics loaded from localStorage");
-        console.log("📊 Calculated stats:", calculatedStats);
-      }
+      console.log("✅ Analytics loaded");
     } catch (error) {
       console.error("❌ Error loading analytics:", error);
-
-      // Fallback empty state
-      setStats({
-        totalClicks: 0,
-        profileViews: 0,
-        activeLinks: 0,
-        totalLinks: 0,
-        monthlyGrowth: 0,
-        earnings: 0,
-        conversionRate: 0,
-        dailyStats: [],
-      });
-      setLinks([]);
+      setStats(AnalyticsTracker.getEmptyAnalytics());
     } finally {
       setIsLoading(false);
     }

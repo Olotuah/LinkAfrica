@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import AnalyticsTracker from "../utils/analytics";
 import KemiCreatesProfile from "./NelsonCreatesProfile";
 import NelsonCreatesProfile from "./NelsonCreatesProfile"; // Import the Nelson profile
 import {
@@ -32,7 +33,7 @@ const UserProfile = () => {
   if (username === "kemicretes") {
     return <KemiCreatesProfile />;
   }
-  
+
   // Add Nelson Creates demo profile
   if (username === "nelsoncretes") {
     return <NelsonCreatesProfile />;
@@ -43,16 +44,16 @@ const UserProfile = () => {
     // ALWAYS use email as the primary identifier for consistency
     // Never use ID to avoid key mismatches
     const identifier = user?.email;
-    
+
     if (!identifier) {
       console.error("❌ No email found for user key generation:", user);
       return null;
     }
-    
+
     const key = prefix ? `${prefix}_${identifier}` : identifier;
-    
+
     console.log(`🔑 Generated key: "${key}" from user email: ${user?.email}`);
-    
+
     return key;
   };
 
@@ -110,7 +111,11 @@ const UserProfile = () => {
         );
         setUserProducts(products);
 
-        console.log(`📦 Loading products for ${userProductsKey}:`, products.length, "products");
+        console.log(
+          `📦 Loading products for ${userProductsKey}:`,
+          products.length,
+          "products"
+        );
         console.log("🛍️ Products data:", products);
 
         console.log(`✅ Profile loaded successfully for ${username}`);
@@ -140,13 +145,21 @@ const UserProfile = () => {
         `🔗 Link clicked: ${link.title} by user: ${user.email || user.username}`
       );
 
+      // TRACK THE CLICK IN ANALYTICS - NEW ANALYTICS TRACKING
+      AnalyticsTracker.trackLinkClick(
+        link.id,
+        link.title,
+        link.url,
+        user?.id || user?.email
+      );
+
       // Update click count in the displayed links
       const updatedLinks = userLinks.map((l) =>
         l.id === link.id ? { ...l, clicks: (l.clicks || 0) + 1 } : l
       );
       setUserLinks(updatedLinks);
 
-      // FIXED: Save to the correct user's localStorage using consistent key generation
+      // Save to localStorage using consistent key generation
       const userLinksKey = getUserKey(user, "links");
       const allUserLinks = JSON.parse(
         localStorage.getItem(userLinksKey) || "[]"
@@ -156,7 +169,7 @@ const UserProfile = () => {
       );
       localStorage.setItem(userLinksKey, JSON.stringify(updatedAllLinks));
 
-      // FIXED: Update user's stats using consistent key generation  
+      // Update user's stats using consistent key generation
       const userStatsKey = getUserKey(user, "stats");
       const currentStats = JSON.parse(
         localStorage.getItem(userStatsKey) || "{}"
@@ -186,7 +199,10 @@ const UserProfile = () => {
   // Add profile view tracking when someone visits the profile
   useEffect(() => {
     if (user && !loading && !error) {
-      // FIXED: Use consistent key generation for stats
+      // TRACK PROFILE VIEW IN ANALYTICS - NEW ANALYTICS TRACKING
+      AnalyticsTracker.trackProfileView(user?.id || user?.email, "direct");
+
+      // Also update the old stats system for backward compatibility
       const userStatsKey = getUserKey(user, "stats");
       const currentStats = JSON.parse(
         localStorage.getItem(userStatsKey) || "{}"
