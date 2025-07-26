@@ -84,50 +84,6 @@ const Analytics = () => {
     console.log("🔍 === END DEBUG ===");
   };
 
-  // Then MODIFY your loadAnalytics function to call this debug:
-
-  const loadAnalytics = async () => {
-    try {
-      setIsLoading(true);
-      console.log("📊 Loading analytics for user:", user?.email);
-
-      // ADD THIS DEBUG CALL
-      debugLinkKeys(user);
-
-      const analytics = await AnalyticsTracker.getAnalyticsData(
-        user?.id || user?.email,
-        parseInt(timeRange)
-      );
-
-      setStats(analytics);
-
-      // FIXED: Load links using consistent key generation (same as Dashboard)
-      const userLinksKey = getUserKey(user, "links");
-      if (userLinksKey) {
-        const savedLinks = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
-        setLinks(savedLinks);
-        console.log(
-          `📦 Analytics links loaded from ${userLinksKey}:`,
-          savedLinks.length
-        );
-      } else {
-        console.error("❌ Could not generate user key for links");
-        setLinks([]);
-      }
-
-      console.log("✅ Analytics loaded");
-    } catch (error) {
-      console.error("❌ Error loading analytics:", error);
-      setStats(AnalyticsTracker.getEmptyAnalytics());
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Replace loadAnalytics function with:
-  // FIXED loadAnalytics function
   // FIXED: Replace your loadAnalytics function in Analytics.jsx with this:
 
   const loadAnalytics = async () => {
