@@ -201,8 +201,7 @@ const Analytics = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}/ 2. ANALYTICS - Replace the entire Header section (second
-        most critical)
+        {/* Header */}
         <div className="mb-8">
           {/* Title Row */}
           <div className="flex items-center space-x-4 mb-4">
