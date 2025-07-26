@@ -128,6 +128,8 @@ const Analytics = () => {
 
   // Replace loadAnalytics function with:
   // FIXED loadAnalytics function
+  // FIXED: Replace your loadAnalytics function in Analytics.jsx with this:
+
   const loadAnalytics = async () => {
     try {
       setIsLoading(true);
@@ -138,14 +140,12 @@ const Analytics = () => {
         parseInt(timeRange)
       );
 
-      setStats(analytics);
-
       // FIXED: Load links using consistent key generation (same as Dashboard)
       const userLinksKey = getUserKey(user, "links");
+      let savedLinks = [];
+
       if (userLinksKey) {
-        const savedLinks = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
+        savedLinks = JSON.parse(localStorage.getItem(userLinksKey) || "[]");
         setLinks(savedLinks);
         console.log(
           `📦 Analytics links loaded from ${userLinksKey}:`,
@@ -156,7 +156,21 @@ const Analytics = () => {
         setLinks([]);
       }
 
+      // FIXED: Calculate active/total links from actual data
+      const totalLinks = savedLinks.length;
+      const activeLinks = savedLinks.filter((link) => link.isActive).length;
+
+      // FIXED: Update stats with real link counts
+      const updatedStats = {
+        ...analytics,
+        totalLinks: totalLinks,
+        activeLinks: activeLinks,
+      };
+
+      setStats(updatedStats);
+
       console.log("✅ Analytics loaded");
+      console.log(`📊 Links summary: ${activeLinks}/${totalLinks} active`);
     } catch (error) {
       console.error("❌ Error loading analytics:", error);
       setStats(AnalyticsTracker.getEmptyAnalytics());
