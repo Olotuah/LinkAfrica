@@ -776,33 +776,43 @@ const Dashboard = () => {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Your LinkAfrika URL
           </h2>
-          <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
-            <Globe className="w-5 h-5 text-gray-400 flex-shrink-0" />
-            <span className="flex-1 text-gray-700 font-medium">
-              linkafrika.com/profile/
-              {user?.username || user?.email || "yourprofile"}
-            </span>
-            <button
-              onClick={copyProfileUrl}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-            >
-              <Copy className="w-4 h-4" />
-              <span>Copy</span>
-            </button>
-            <button
-              onClick={() => {
-                const username = user?.username || user?.email;
-                if (!username) {
-                  navigate("/onboarding");
-                } else {
-                  window.open(`/profile/${username}`, "_blank");
-                }
-              }}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>View</span>
-            </button>
+
+          {/* Stack on mobile, row on >= sm */}
+          <div className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Icon + URL (let it wrap/truncate properly) */}
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+              <Globe className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <span className="flex-1 text-gray-700 font-medium break-all sm:break-normal min-w-0">
+                link-africa.vercel.app/profile/
+                {user?.username || user?.email || "yourprofile"}
+              </span>
+            </div>
+
+            {/* Buttons — full width on mobile, inline on >= sm */}
+            <div className="flex w-full sm:w-auto gap-2">
+              <button
+                onClick={copyProfileUrl}
+                className="flex-1 sm:flex-none px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                <span>Copy</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const username = user?.username || user?.email;
+                  if (!username) {
+                    navigate("/onboarding");
+                  } else {
+                    window.open(`/profile/${username}`, "_blank");
+                  }
+                }}
+                className="flex-1 sm:flex-none px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>View</span>
+              </button>
+            </div>
           </div>
         </div>
 
