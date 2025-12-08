@@ -62,82 +62,63 @@ const UserProfile = () => {
   }, [username]);
 
   const loadUserProfile = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  try {
+    setLoading(true);
+    setError("");
 
-      console.log("🔍 Looking for profile with username:", username);
+    console.log("🔍 Fetching public profile for:", username);
 
-      const users = JSON.parse(localStorage.getItem("users") || "[]");
-      console.log(
-        "📋 Available users:",
-        users.map((u) => ({
-          id: u.id,
-          email: u.email,
-          username: u.username,
-          onboardingCompleted: u.onboardingCompleted,
-        }))
-      );
+    // If you already use a custom API base URL, replace `/api/public/...`
+    // with that same base (e.g. https://linkafrica.onrender.com/api/public/${username})
+    const res = await fetch(`/api/public/${username}`);
 
-      const foundUser = users.find(
-        (u) => u.username && u.username.toLowerCase() === username.toLowerCase()
-      );
-
-      if (foundUser) {
-        console.log(
-          "✅ User found:",
-          foundUser.email,
-          "with username:",
-          foundUser.username
-        );
-        setUser(foundUser);
-
-        // FIXED: Use consistent key generation for links
-        const userLinksKey = getUserKey(foundUser, "links");
-        const userLinksData = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
-
-        console.log(
-          `📦 Loading profile links for ${userLinksKey}:`,
-          userLinksData
-        );
-        setUserLinks(userLinksData.filter((link) => link.isActive));
-
-        // FIXED: Use consistent key generation for products
-        const userProductsKey = getUserKey(foundUser, "products");
-        const products = JSON.parse(
-          localStorage.getItem(userProductsKey) || "[]"
-        );
-        setUserProducts(products);
-
-        console.log(
-          `📦 Loading products for ${userProductsKey}:`,
-          products.length,
-          "products"
-        );
-        console.log("🛍️ Products data:", products);
-
-        console.log(`✅ Profile loaded successfully for ${username}`);
-      } else {
+    if (!res.ok) {
+      if (res.status === 404) {
         console.error(`❌ No user found with username: ${username}`);
-        console.log(
-          "🔍 Searched for username (case-insensitive):",
-          username.toLowerCase()
-        );
-        console.log(
-          "📋 Available usernames:",
-          users.map((u) => u.username).filter(Boolean)
-        );
         setError("Profile not found");
+        return;
       }
-    } catch (error) {
-      console.error("❌ Error loading user profile:", error);
-      setError("Failed to load profile");
-    } finally {
-      setLoading(false);
+      throw new Error("Failed to load profile");
     }
-  };
+
+    // Your /api/public/:username returns a single publicProfile object:
+    // {
+    //   id, username, displayName, bio, avatarUrl,
+    //   theme, isPro, profileViews, followerCount, links: [...]
+    // }
+    const data = await res.json();
+
+    console.log("✅ Public profile data:", data);
+
+    // Set user state directly from API response
+    setUser({
+      id: data.id,
+      username: data.username,
+      displayName: data.displayName,
+      bio: data.bio,
+      avatarUrl: data.avatarUrl,
+      theme: data.theme,
+      isPro: data.isPro,
+      profileViews: data.profileViews,
+      followerCount: data.followerCount,
+    });
+
+    // Links come from data.links
+    const links = Array.isArray(data.links) ? data.links : [];
+    setUserLinks(links);
+
+    // You can later separate products if you start marking them on the backend
+    setUserProducts([]);
+
+    console.log(`✅ Profile loaded successfully for ${username}`);
+  } catch (error) {
+    console.error("❌ Error loading user profile:", error);
+    setError("Failed to load profile");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // UNIVERSAL LINKS LOADER - Add this function to Analytics.jsx
 
