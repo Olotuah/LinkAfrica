@@ -86,7 +86,7 @@ const UserProfile = () => {
 
     console.log("✅ Public profile data:", data);
 
-    // Set user from public data
+    // NOTE: include email if your backend sends it
     const publicUser = {
       id: data.id,
       username: data.username,
@@ -97,6 +97,7 @@ const UserProfile = () => {
       isPro: data.isPro,
       profileViews: data.profileViews,
       followerCount: data.followerCount,
+      email: data.email, // 👈 IMPORTANT if available
     };
     setUser(publicUser);
 
@@ -108,21 +109,24 @@ const UserProfile = () => {
         }))
       : [];
 
-    // 2️⃣ If backend returns NO links, fall back to localStorage
-    if (links.length === 0 && typeof window !== "undefined") {
-      console.log(
-        "⚠️ No links returned from backend, trying localStorage fallback..."
-      );
+    // 2️⃣ Fallback to localStorage if backend has no links
+    if (typeof window !== "undefined") {
+      if (links.length === 0) {
+        console.log(
+          "⚠️ No links returned from backend, trying localStorage fallback..."
+        );
+      }
 
       const possibleKeys = [];
 
-      // Based on public data
+      // Based on public API data
       if (data.id) possibleKeys.push(`links_${data.id}`);
       if (data.username) possibleKeys.push(`links_${data.username}`);
       if (data.id || data.username)
         possibleKeys.push(`links_${data.id || data.username}`);
+      if (data.email) possibleKeys.push(`links_${data.email}`); // 👈 match Dashboard key if API returns email
 
-      // 🔥 ALSO based on current session user (same browser)
+      // Based on current session user (Auth user in this browser)
       try {
         const rawSession = localStorage.getItem("user");
         if (rawSession) {
@@ -170,7 +174,7 @@ const UserProfile = () => {
       }
 
       if (!links.length) {
-        console.log("❌ No links found in fallback localStorage either.");
+        console.log("❌ No links found in any localStorage key.");
       }
     }
 
@@ -187,6 +191,7 @@ const UserProfile = () => {
     setLoading(false);
   }
 };
+
 
   const handleLinkClick = async (link) => {
     try {
