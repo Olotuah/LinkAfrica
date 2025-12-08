@@ -16,7 +16,6 @@ import {
   Eye,
   ArrowLeft,
   Share,
-  Heart,
   Briefcase,
 } from "lucide-react";
 
@@ -39,95 +38,98 @@ const UserProfile = () => {
     return <NelsonCreatesProfile />;
   }
 
-  // FIXED: Consistent key generation function (matches Dashboard)
+  // Consistent key generation function (used for localStorage stats only)
   const getUserKey = (user, prefix = "") => {
-    // ALWAYS use email as the primary identifier for consistency
-    // Never use ID to avoid key mismatches
-    const identifier = user?.email;
+    // On the public profile, user usually won't have email (only id, username, etc.)
+    const identifier = user?.email || user?.id || user?.username;
 
     if (!identifier) {
-      console.error("❌ No email found for user key generation:", user);
+      console.error("❌ No identifier found for user key generation:", user);
       return null;
     }
 
     const key = prefix ? `${prefix}_${identifier}` : identifier;
 
-    console.log(`🔑 Generated key: "${key}" from user email: ${user?.email}`);
+    console.log(`🔑 Generated key: "${key}" from identifier: ${identifier}`);
 
     return key;
   };
 
   useEffect(() => {
     loadUserProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
   const loadUserProfile = async () => {
-  try {
-    setLoading(true);
-    setError("");
+    try {
+      setLoading(true);
+      setError("");
 
-    console.log("🔍 Fetching public profile for:", username);
+      console.log("🔍 Fetching public profile for:", username);
 
-    // Use your backend base URL (Render) via env or fallback to local
-    const API_BASE_URL =
-      import.meta.env.VITE_API_BASE_URL || "https://linkafrica.onrender.com/api";
+      // Use your backend base URL (Render) via env or fallback to live URL
+      const API_BASE_URL =
+        import.meta.env.VITE_API_BASE_URL ||
+        "https://linkafrica.onrender.com/api";
 
-    const res = await fetch(`${API_BASE_URL}/public/${username}`);
+      const res = await fetch(`${API_BASE_URL}/public/${username}`);
 
-    console.log("🌍 /public response status:", res.status);
+      console.log("🌍 /public response status:", res.status);
 
-    if (!res.ok) {
-      if (res.status === 404) {
-        console.error(`❌ No user found with username: ${username}`);
-        setError("Profile not found");
-        return;
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.error(`❌ No user found with username: ${username}`);
+          setError("Profile not found");
+          return;
+        }
+        throw new Error(`Failed to load profile, status ${res.status}`);
       }
-      throw new Error(`Failed to load profile, status ${res.status}`);
+
+      // /api/public/:username returns ONE object:
+      // { id, username, displayName, bio, avatarUrl, theme, isPro, profileViews, followerCount, links: [...] }
+      const data = await res.json();
+
+      console.log("✅ Public profile data:", data);
+
+      // Set user state directly from API response
+      setUser({
+        id: data.id,
+        username: data.username,
+        displayName: data.displayName,
+        bio: data.bio,
+        avatarUrl: data.avatarUrl,
+        theme: data.theme || "purple",
+        isPro: data.isPro,
+        profileViews: data.profileViews,
+        followerCount: data.followerCount,
+      });
+
+      // Links come from data.links.
+      // IMPORTANT: Ensure they are treated as active by default.
+      const links = Array.isArray(data.links)
+        ? data.links.map((l) => ({
+          ...l,
+          isActive: l.isActive ?? true, // default to true if missing
+        }))
+        : [];
+      setUserLinks(links);
+
+      // For now, no separate products coming from backend
+      setUserProducts([]);
+
+      console.log(`✅ Profile loaded successfully for ${username}`);
+    } catch (error) {
+      console.error("❌ Error loading user profile:", error);
+      setError("Failed to load profile");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Your /api/public/:username returns ONE object like:
-    // { id, username, displayName, bio, avatarUrl, theme, isPro, profileViews, followerCount, links: [...] }
-    const data = await res.json();
-
-    console.log("✅ Public profile data:", data);
-
-    // Set user state directly from API response
-    setUser({
-      id: data.id,
-      username: data.username,
-      displayName: data.displayName,
-      bio: data.bio,
-      avatarUrl: data.avatarUrl,
-      theme: data.theme || "purple",
-      isPro: data.isPro,
-      profileViews: data.profileViews,
-      followerCount: data.followerCount,
-    });
-
-    // Links come from data.links
-    const links = Array.isArray(data.links) ? data.links : [];
-    setUserLinks(links);
-
-    // For now, no separate products coming from backend
-    setUserProducts([]);
-
-    console.log(`✅ Profile loaded successfully for ${username}`);
-  } catch (error) {
-    console.error("❌ Error loading user profile:", error);
-    setError("Failed to load profile");
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
-  // UNIVERSAL LINKS LOADER - Add this function to Analytics.jsx
-
+  // UNIVERSAL LINKS LOADER - (not used here directly, kept for future analytics)
   const loadUserLinks = (user) => {
     console.log("🔍 Searching for user links...");
 
-    // All possible key variations we might have used
     const possibleKeys = [
       `links_${user?.email}`,
       `links_${user?.id}`,
@@ -135,7 +137,6 @@ const UserProfile = () => {
       `links_${user?.email || user?.id}`,
     ];
 
-    // Remove duplicates and undefined keys
     const uniqueKeys = [...new Set(possibleKeys)].filter(
       (key) => key && key !== "links_undefined" && key !== "links_null"
     );
@@ -161,146 +162,20 @@ const UserProfile = () => {
     return [];
   };
 
-  // REPLACE your loadAnalytics function with this BULLETPROOF version:
-
-  // In Analytics.jsx - REPLACE the loadAnalytics function with this FIXED version:
-
-  const loadAnalytics = async () => {
-    try {
-      setIsLoading(true);
-      console.log("📊 Loading analytics for user:", user?.email);
-
-      // Get analytics data
-      const analytics = await AnalyticsTracker.getAnalyticsData(
-        user?.id || user?.email,
-        parseInt(timeRange)
-      );
-
-      // FIXED: Load links using the same key format as Dashboard
-      const userLinksKey = `links_${user?.email}`; // Use email consistently
-      const savedLinks = JSON.parse(localStorage.getItem(userLinksKey) || "[]");
-
-      console.log(
-        `📦 Loading links from ${userLinksKey}:`,
-        savedLinks.length,
-        "links found"
-      );
-      console.log("🔗 Links data:", savedLinks);
-
-      // If no links found with email, try with ID as fallback
-      if (savedLinks.length === 0 && user?.id) {
-        const fallbackKey = `links_${user.id}`;
-        const fallbackLinks = JSON.parse(
-          localStorage.getItem(fallbackKey) || "[]"
-        );
-        console.log(
-          `📦 Fallback: Loading links from ${fallbackKey}:`,
-          fallbackLinks.length,
-          "links found"
-        );
-
-        if (fallbackLinks.length > 0) {
-          setLinks(fallbackLinks);
-        } else {
-          setLinks([]);
-        }
-      } else {
-        setLinks(savedLinks);
-      }
-
-      // Update analytics stats with actual link counts
-      const updatedAnalytics = {
-        ...analytics,
-        totalLinks: savedLinks.length,
-        activeLinks: savedLinks.filter((link) => link.isActive).length,
-      };
-
-      setStats(updatedAnalytics);
-
-      console.log("✅ Analytics loaded successfully");
-      console.log("📊 Final analytics:", updatedAnalytics);
-      console.log("🔗 Final links:", savedLinks.length);
-    } catch (error) {
-      console.error("❌ Error loading analytics:", error);
-      setStats(AnalyticsTracker.getEmptyAnalytics());
-      setLinks([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ADD THIS DEBUG BUTTON to your Analytics.jsx (temporarily for debugging)
-
-  const DebugLinksButton = () => (
-    <button
-      onClick={() => {
-        console.log("🐛 === LINKS DEBUG ===");
-        console.log("Current user:", {
-          id: user?.id,
-          email: user?.email,
-          username: user?.username,
-        });
-
-        // Check all possible link keys
-        const possibleKeys = [
-          `links_${user?.email}`,
-          `links_${user?.id}`,
-          `links_${user?.id || user?.email}`,
-          `links_${user?.email || user?.id}`,
-        ];
-
-        console.log("Checking all possible link keys:");
-        possibleKeys.forEach((key) => {
-          const data = localStorage.getItem(key);
-          if (data) {
-            const links = JSON.parse(data);
-            console.log(
-              `✅ Found links for key "${key}":`,
-              links.length,
-              "links"
-            );
-            console.log("Links preview:", links.slice(0, 2));
-          } else {
-            console.log(`❌ No data for key "${key}"`);
-          }
-        });
-
-        // Check current state
-        console.log("Current links state:", links);
-        console.log("Current stats state:", stats);
-
-        // Check ALL localStorage keys
-        console.log('ALL localStorage keys with "links":');
-        Object.keys(localStorage).forEach((key) => {
-          if (key.includes("links")) {
-            const data = JSON.parse(localStorage.getItem(key) || "[]");
-            console.log(`📦 ${key}: ${data.length} items`);
-          }
-        });
-
-        console.log("🐛 === END DEBUG ===");
-      }}
-      className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600"
-    >
-      Debug Links
-    </button>
-  );
-
-  // Add this button next to your Export and Share buttons in the header:
-  // <DebugLinksButton />
-
   const handleLinkClick = async (link) => {
     try {
       console.log(
-        `🔗 Link clicked: ${link.title} by user: ${user.email || user.username}`
+        `🔗 Link clicked: ${link.title} by user: ${
+          user?.email || user?.username || user?.id
+        }`
       );
 
-      // TRACK THE CLICK IN ANALYTICS - NEW ANALYTICS TRACKING
+      // TRACK THE CLICK IN ANALYTICS (backend)
       AnalyticsTracker.trackLinkClick(
         link.id,
         link.title,
         link.url,
-        user?.id || user?.email
+        user?.id || user?.email || user?.username
       );
 
       // Update click count in the displayed links
@@ -309,34 +184,37 @@ const UserProfile = () => {
       );
       setUserLinks(updatedLinks);
 
-      // Save to localStorage using consistent key generation
+      // Try localStorage updates only if we have a valid key
       const userLinksKey = getUserKey(user, "links");
-      const allUserLinks = JSON.parse(
-        localStorage.getItem(userLinksKey) || "[]"
-      );
-      const updatedAllLinks = allUserLinks.map((l) =>
-        l.id === link.id ? { ...l, clicks: (l.clicks || 0) + 1 } : l
-      );
-      localStorage.setItem(userLinksKey, JSON.stringify(updatedAllLinks));
+      if (userLinksKey) {
+        const allUserLinks = JSON.parse(
+          localStorage.getItem(userLinksKey) || "[]"
+        );
+        const updatedAllLinks = allUserLinks.map((l) =>
+          l.id === link.id ? { ...l, clicks: (l.clicks || 0) + 1 } : l
+        );
+        localStorage.setItem(userLinksKey, JSON.stringify(updatedAllLinks));
+      }
 
-      // Update user's stats using consistent key generation
       const userStatsKey = getUserKey(user, "stats");
-      const currentStats = JSON.parse(
-        localStorage.getItem(userStatsKey) || "{}"
-      );
-      const updatedStats = {
-        ...currentStats,
-        totalClicks: (currentStats.totalClicks || 0) + 1,
-        lastClickDate: new Date().toISOString(),
-      };
-      localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
+      if (userStatsKey) {
+        const currentStats = JSON.parse(
+          localStorage.getItem(userStatsKey) || "{}"
+        );
+        const updatedStats = {
+          ...currentStats,
+          totalClicks: (currentStats.totalClicks || 0) + 1,
+          lastClickDate: new Date().toISOString(),
+        };
+        localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
 
-      console.log(
-        `✅ Click tracked: ${link.title} now has ${
-          (link.clicks || 0) + 1
-        } clicks`
-      );
-      console.log(`📊 User total clicks now: ${updatedStats.totalClicks}`);
+        console.log(
+          `✅ Click tracked: ${link.title} now has ${
+            (link.clicks || 0) + 1
+          } clicks`
+        );
+        console.log(`📊 User total clicks now: ${updatedStats.totalClicks}`);
+      }
 
       // Open link
       window.open(link.url, "_blank");
@@ -346,27 +224,30 @@ const UserProfile = () => {
     }
   };
 
-  // Add profile view tracking when someone visits the profile
+  // Track profile view when someone visits the profile
   useEffect(() => {
     if (user && !loading && !error) {
-      // TRACK PROFILE VIEW IN ANALYTICS - NEW ANALYTICS TRACKING
-      AnalyticsTracker.trackProfileView(user?.id || user?.email, "direct");
+      AnalyticsTracker.trackProfileView(
+        user?.id || user?.email || user?.username,
+        "direct"
+      );
 
-      // Also update the old stats system for backward compatibility
       const userStatsKey = getUserKey(user, "stats");
-      const currentStats = JSON.parse(
-        localStorage.getItem(userStatsKey) || "{}"
-      );
-      const updatedStats = {
-        ...currentStats,
-        profileViews: (currentStats.profileViews || 0) + 1,
-        lastViewDate: new Date().toISOString(),
-      };
-      localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
+      if (userStatsKey) {
+        const currentStats = JSON.parse(
+          localStorage.getItem(userStatsKey) || "{}"
+        );
+        const updatedStats = {
+          ...currentStats,
+          profileViews: (currentStats.profileViews || 0) + 1,
+          lastViewDate: new Date().toISOString(),
+        };
+        localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
 
-      console.log(
-        `👁️ Profile view tracked for ${username}: ${updatedStats.profileViews} total views`
-      );
+        console.log(
+          `👁️ Profile view tracked for ${username}: ${updatedStats.profileViews} total views`
+        );
+      }
     }
   }, [user, loading, error, username]);
 
@@ -439,7 +320,6 @@ const UserProfile = () => {
     return colors[index % colors.length];
   };
 
-  // FIXED: Add product type icons (matches Dashboard)
   const getProductTypeIcon = (type) => {
     const icons = {
       ebook: <BookOpen className="w-5 h-5 text-green-600" />,
@@ -525,7 +405,7 @@ const UserProfile = () => {
             className={`w-24 h-24 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}
           >
             <span className="text-white text-2xl font-bold">
-              {(user.displayName || user.name || user.email || "U")
+              {(user.displayName || user.name || user.username || "U")
                 .charAt(0)
                 .toUpperCase()}
             </span>
@@ -557,7 +437,7 @@ const UserProfile = () => {
           </div>
         </div>
 
-        {/* Products Section - FIXED: Now properly displays products */}
+        {/* Products Section */}
         {userProducts.length > 0 && (
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -602,31 +482,29 @@ const UserProfile = () => {
         {/* Links Section */}
         {userLinks.length > 0 ? (
           <div className="space-y-3 mb-8">
-            {userLinks
-              .filter((link) => link.isActive)
-              .map((link, index) => (
-                <button
-                  key={link.id}
-                  onClick={() => handleLinkClick(link)}
-                  className={`w-full p-4 bg-gradient-to-r ${getLinkColor(
-                    link.type,
-                    index
-                  )} text-white rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200 flex items-center justify-between group`}
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                      {getLinkTypeIcon(link.type)}
-                    </div>
-                    <div className="text-left">
-                      <div className="font-semibold">{link.title}</div>
-                      <div className="text-sm opacity-75">
-                        {link.clicks || 0} clicks
-                      </div>
+            {userLinks.map((link, index) => (
+              <button
+                key={link.id}
+                onClick={() => handleLinkClick(link)}
+                className={`w-full p-4 bg-gradient-to-r ${getLinkColor(
+                  link.type,
+                  index
+                )} text-white rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200 flex items-center justify-between group`}
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    {getLinkTypeIcon(link.type)}
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold">{link.title}</div>
+                    <div className="text-sm opacity-75">
+                      {link.clicks || 0} clicks
                     </div>
                   </div>
-                  <ExternalLink className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
-                </button>
-              ))}
+                </div>
+                <ExternalLink className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))}
           </div>
         ) : (
           <div className="text-center py-12">
