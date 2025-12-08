@@ -33,14 +33,12 @@ const UserProfile = () => {
     return <KemiCreatesProfile />;
   }
 
-  // Add Nelson Creates demo profile
   if (username === "nelsoncretes") {
     return <NelsonCreatesProfile />;
   }
 
-  // Consistent key generation function (used for localStorage stats only)
+  // Used only for localStorage stats / link sync
   const getUserKey = (user, prefix = "") => {
-    // On the public profile, user usually won't have email (only id, username, etc.)
     const identifier = user?.email || user?.id || user?.username;
 
     if (!identifier) {
@@ -67,7 +65,6 @@ const UserProfile = () => {
 
       console.log("🔍 Fetching public profile for:", username);
 
-      // Use your backend base URL (Render) via env or fallback to live URL
       const API_BASE_URL =
         import.meta.env.VITE_API_BASE_URL ||
         "https://linkafrica.onrender.com/api";
@@ -85,14 +82,12 @@ const UserProfile = () => {
         throw new Error(`Failed to load profile, status ${res.status}`);
       }
 
-      // /api/public/:username returns ONE object:
-      // { id, username, displayName, bio, avatarUrl, theme, isPro, profileViews, followerCount, links: [...] }
       const data = await res.json();
 
       console.log("✅ Public profile data:", data);
 
-      // Set user state directly from API response
-      setUser({
+      // Set user state directly from API
+      const publicUser = {
         id: data.id,
         username: data.username,
         displayName: data.displayName,
@@ -102,64 +97,73 @@ const UserProfile = () => {
         isPro: data.isPro,
         profileViews: data.profileViews,
         followerCount: data.followerCount,
-      });
+      };
+      setUser(publicUser);
 
-      // Links come from data.links.
-      // IMPORTANT: Ensure they are treated as active by default.
-      const links = Array.isArray(data.links)
+      // 1️⃣ Links from backend
+      let links = Array.isArray(data.links)
         ? data.links.map((l) => ({
-          ...l,
-          isActive: l.isActive ?? true, // default to true if missing
-        }))
+            ...l,
+            isActive: l.isActive ?? true, // default to true
+          }))
         : [];
+
+      // 2️⃣ If backend has no links, FALL BACK to localStorage (same browser)
+      if (links.length === 0 && typeof window !== "undefined") {
+        console.log(
+          "⚠️ No links returned from backend, trying localStorage fallback..."
+        );
+
+        const possibleKeys = [
+          `links_${data.id}`,
+          `links_${data.username}`,
+          `links_${data.id || data.username}`,
+        ];
+
+        const uniqueKeys = [...new Set(possibleKeys)].filter(
+          (key) => key && key !== "links_undefined" && key !== "links_null"
+        );
+
+        console.log("🔑 Checking localStorage keys for links:", uniqueKeys);
+
+        for (const key of uniqueKeys) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw || raw === "[]") continue;
+
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              console.log(
+                `✅ Found ${parsed.length} links in localStorage under "${key}"`
+              );
+              links = parsed.map((l) => ({
+                ...l,
+                isActive: l.isActive ?? true,
+              }));
+              break;
+            }
+          } catch (e) {
+            console.error(`❌ Error reading links from "${key}":`, e);
+          }
+        }
+
+        if (!links.length) {
+          console.log("❌ No links found in fallback localStorage either.");
+        }
+      }
+
       setUserLinks(links);
+      setUserProducts([]); // (reserved for future backend products)
 
-      // For now, no separate products coming from backend
-      setUserProducts([]);
-
-      console.log(`✅ Profile loaded successfully for ${username}`);
+      console.log(
+        `✅ Profile loaded successfully for ${username} with ${links.length} links`
+      );
     } catch (error) {
       console.error("❌ Error loading user profile:", error);
       setError("Failed to load profile");
     } finally {
       setLoading(false);
     }
-  };
-
-  // UNIVERSAL LINKS LOADER - (not used here directly, kept for future analytics)
-  const loadUserLinks = (user) => {
-    console.log("🔍 Searching for user links...");
-
-    const possibleKeys = [
-      `links_${user?.email}`,
-      `links_${user?.id}`,
-      `links_${user?.id || user?.email}`,
-      `links_${user?.email || user?.id}`,
-    ];
-
-    const uniqueKeys = [...new Set(possibleKeys)].filter(
-      (key) => key && key !== "links_undefined" && key !== "links_null"
-    );
-
-    console.log("🔑 Checking keys:", uniqueKeys);
-
-    for (const key of uniqueKeys) {
-      const data = localStorage.getItem(key);
-      if (data && data !== "[]") {
-        try {
-          const links = JSON.parse(data);
-          if (links.length > 0) {
-            console.log(`✅ Found ${links.length} links with key: ${key}`);
-            return links;
-          }
-        } catch (error) {
-          console.log(`❌ Error parsing data for key ${key}:`, error);
-        }
-      }
-    }
-
-    console.log("❌ No links found for any key variation");
-    return [];
   };
 
   const handleLinkClick = async (link) => {
@@ -170,7 +174,7 @@ const UserProfile = () => {
         }`
       );
 
-      // TRACK THE CLICK IN ANALYTICS (backend)
+      // Track click in analytics backend
       AnalyticsTracker.trackLinkClick(
         link.id,
         link.title,
@@ -178,15 +182,15 @@ const UserProfile = () => {
         user?.id || user?.email || user?.username
       );
 
-      // Update click count in the displayed links
+      // Update UI click count
       const updatedLinks = userLinks.map((l) =>
         l.id === link.id ? { ...l, clicks: (l.clicks || 0) + 1 } : l
       );
       setUserLinks(updatedLinks);
 
-      // Try localStorage updates only if we have a valid key
+      // Try update localStorage stats (owner-view)
       const userLinksKey = getUserKey(user, "links");
-      if (userLinksKey) {
+      if (userLinksKey && typeof window !== "undefined") {
         const allUserLinks = JSON.parse(
           localStorage.getItem(userLinksKey) || "[]"
         );
@@ -197,7 +201,7 @@ const UserProfile = () => {
       }
 
       const userStatsKey = getUserKey(user, "stats");
-      if (userStatsKey) {
+      if (userStatsKey && typeof window !== "undefined") {
         const currentStats = JSON.parse(
           localStorage.getItem(userStatsKey) || "{}"
         );
@@ -216,7 +220,6 @@ const UserProfile = () => {
         console.log(`📊 User total clicks now: ${updatedStats.totalClicks}`);
       }
 
-      // Open link
       window.open(link.url, "_blank");
     } catch (error) {
       console.error("❌ Error tracking click:", error);
@@ -224,7 +227,7 @@ const UserProfile = () => {
     }
   };
 
-  // Track profile view when someone visits the profile
+  // Track profile view
   useEffect(() => {
     if (user && !loading && !error) {
       AnalyticsTracker.trackProfileView(
@@ -233,7 +236,7 @@ const UserProfile = () => {
       );
 
       const userStatsKey = getUserKey(user, "stats");
-      if (userStatsKey) {
+      if (userStatsKey && typeof window !== "undefined") {
         const currentStats = JSON.parse(
           localStorage.getItem(userStatsKey) || "{}"
         );
