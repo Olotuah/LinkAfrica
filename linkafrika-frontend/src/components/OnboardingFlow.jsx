@@ -217,11 +217,23 @@ const OnboardingFlow = () => {
 
   const completeOnboarding = async () => {
   try {
+    setIsLoading(true);
+    setError("");
+
     console.log("🚀 Starting onboarding completion...");
     console.log("📝 Profile data to save:", profileData);
 
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL ||
+      "https://linkafrica.onrender.com/api";
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("No auth token found. Please login again.");
+    }
+
     const updateData = {
-      username: profileData.username,
+      username: profileData.username,          // e.g. "nelson"
       displayName: profileData.displayName,
       bio: profileData.bio,
       theme: profileData.theme,
@@ -230,149 +242,80 @@ const OnboardingFlow = () => {
       updatedAt: new Date().toISOString(),
     };
 
-    console.log("📝 Updating profile with:", updateData);
+    console.log("📝 Sending profile update to backend:", updateData);
 
-    // Get current user with better error handling
-    let currentUser;
-    try {
-      currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-    } catch (e) {
-      console.error("Failed to parse current user");
-      throw new Error("Session error. Please login again.");
+    // 🔐 Update user on BACKEND (real source of truth for /api/public/:username)
+    const res = await fetch(`${API_BASE_URL}/user/profile`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`, // linkafrika-token-...
+      },
+      body: JSON.stringify(updateData),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      console.error("❌ Backend profile update failed:", res.status, errBody);
+      throw new Error(errBody.error || "Failed to update profile");
     }
 
-    console.log("👤 Current user before update:", currentUser);
+    const result = await res.json();
+    const apiUser = result.user || result;
 
-    if (!currentUser.id && !currentUser.email) {
-      throw new Error("No current user found. Please login again.");
-    }
+    console.log("✅ Backend profile updated:", apiUser);
 
-    // Update current user in localStorage
-    const updatedCurrentUser = { ...currentUser, ...updateData };
-
+    // 🔄 Update localStorage "user"
     try {
-      localStorage.setItem("user", JSON.stringify(updatedCurrentUser));
-      console.log("✅ Updated current user in localStorage:", updatedCurrentUser);
+      localStorage.setItem("user", JSON.stringify(apiUser));
+      console.log("✅ Saved updated user to localStorage:", apiUser);
     } catch (storageError) {
-      console.error("❌ Failed to update current user:", storageError);
-      throw new Error("Failed to save user session. Please try again.");
+      console.error("❌ Failed to save current user:", storageError);
     }
 
-    // CRITICAL: Update users array with comprehensive error handling
-    let users = [];
+    // 🧰 Optional: keep local "users" array in sync (for older logic / debug)
     try {
-      const usersData = localStorage.getItem("users");
-      console.log("📊 Raw users data from localStorage:", usersData);
-      users = JSON.parse(usersData || "[]");
-    } catch (e) {
-      console.warn("Invalid users data, starting fresh:", e);
-      users = [];
-    }
-
-    console.log("📊 Users array before update:", users.length, "users");
-    console.log("🔍 Looking for user with ID:", currentUser.id, "or email:", currentUser.email);
-
-    // Find user with multiple fallback methods
-    let userIndex = -1;
-    let foundUser = null;
-
-    // Method 1: Find by ID
-    if (currentUser.id) {
-      userIndex = users.findIndex((u) => u.id === currentUser.id);
-      if (userIndex !== -1) {
-        foundUser = users[userIndex];
-        console.log("✅ Found user by ID at index:", userIndex);
+      let users = [];
+      try {
+        users = JSON.parse(localStorage.getItem("users") || "[]");
+      } catch (e) {
+        console.warn("Invalid users data, starting fresh:", e);
+        users = [];
       }
-    }
 
-    // Method 2: Find by email (case-insensitive)
-    if (userIndex === -1 && currentUser.email) {
-      userIndex = users.findIndex(
-        (u) => u.email && u.email.toLowerCase() === currentUser.email.toLowerCase()
+      const idx = users.findIndex(
+        (u) =>
+          u.id === apiUser.id ||
+          (u.email &&
+            apiUser.email &&
+            u.email.toLowerCase() === apiUser.email.toLowerCase())
       );
-      if (userIndex !== -1) {
-        foundUser = users[userIndex];
-        console.log("✅ Found user by email at index:", userIndex);
-      }
-    }
 
-    if (userIndex !== -1 && foundUser) {
-      // Update existing user completely
-      const updatedUser = { ...foundUser, ...updateData };
-      users[userIndex] = updatedUser;
-      console.log(`✅ Updated existing user at index ${userIndex}`);
-      console.log("🔄 Updated user data:", updatedUser);
-    } else {
-      // CRITICAL FIX: If user not found, add them with password
-      console.warn("⚠️ User not found in users array, adding them...");
-      console.log("🔍 All users in array:", users.map((u) => ({ id: u.id, email: u.email, username: u.username })));
-
-      // IMPORTANT: For API users, we need to prompt for password or use a default
-      // Since we don't have the password, we'll create a special marker
-      const newUser = { 
-        ...updatedCurrentUser,
-        // CRITICAL: Add password field - we need to handle this
-        password: null, // Mark as needs password reset
-        needsPasswordReset: true, // Flag for password reset
-        registeredViaAPI: true // Mark as API registration
-      };
-      
-      users.push(newUser);
-      userIndex = users.length - 1;
-      console.log("✅ Added user to users array at index:", userIndex);
-      console.log("⚠️ User needs password reset due to API registration");
-    }
-
-    // Save updated users array with comprehensive error handling
-    try {
-      const usersJson = JSON.stringify(users);
-      localStorage.setItem("users", usersJson);
-      console.log("💾 Saved users array with", users.length, "users");
-    } catch (storageError) {
-      console.error("❌ Failed to save users array:", storageError);
-      throw new Error("Failed to save profile data. Storage might be full.");
-    }
-
-    // Verification and rest of function stays the same...
-    console.log("🔍 Starting verification process...");
-
-    try {
-      const verifyUsers = JSON.parse(localStorage.getItem("users") || "[]");
-      const verifyUser = verifyUsers.find((u) => u.username === profileData.username);
-
-      if (verifyUser) {
-        console.log("✅ VERIFICATION SUCCESSFUL");
-        console.log("👤 Found user with username:", verifyUser.username);
-        console.log("🎯 Onboarding completed:", verifyUser.onboardingCompleted);
-        console.log("💎 Pro status:", verifyUser.isPro);
-        console.log("🔑 Has password:", !!verifyUser.password);
-        console.log("⚠️ Needs password reset:", verifyUser.needsPasswordReset);
+      if (idx !== -1) {
+        users[idx] = { ...users[idx], ...apiUser };
+        console.log("🔄 Updated existing user in local 'users' at index:", idx);
       } else {
-        console.error("❌ VERIFICATION FAILED - User not found after save");
+        users.push(apiUser);
+        console.log("➕ Added user to local 'users' array");
       }
-    } catch (verifyError) {
-      console.error("❌ Verification process failed:", verifyError);
+
+      localStorage.setItem("users", JSON.stringify(users));
+      console.log("💾 Saved local 'users' array with", users.length, "users");
+    } catch (usersError) {
+      console.error("❌ Failed to sync local 'users' array:", usersError);
     }
 
-    // Update auth context
-    if (updateUser && typeof updateUser === "function") {
-      try {
-        updateUser(updateData);
-        console.log("✅ Updated auth context");
-      } catch (contextError) {
-        console.error("❌ Failed to update auth context:", contextError);
-      }
-    }
+    // 💾 Save initial links locally (same as before – optional for now)
+    try {
+      const enabledLinks = initialLinks.filter(
+        (link) => link.enabled && link.url.trim()
+      );
 
-    // Save initial links
-    const enabledLinks = initialLinks.filter((link) => link.enabled && link.url.trim());
-
-    if (enabledLinks.length > 0) {
-      try {
-        const userLinksKey = `links_${currentUser.id || currentUser.email}`;
+      if (enabledLinks.length > 0) {
+        const userLinksKey = `links_${apiUser.id || apiUser.email}`;
         const linksToSave = enabledLinks.map((link, index) => ({
           id: Date.now() + index,
-          userId: currentUser.id || currentUser.email,
+          userId: apiUser.id || apiUser.email,
           title: link.title,
           url: link.url,
           type: link.type,
@@ -383,32 +326,41 @@ const OnboardingFlow = () => {
         }));
 
         localStorage.setItem(userLinksKey, JSON.stringify(linksToSave));
-        console.log(`✅ Saved ${linksToSave.length} initial links to ${userLinksKey}`);
-      } catch (linksError) {
-        console.error("❌ Failed to save links:", linksError);
+        console.log(
+          `✅ Saved ${linksToSave.length} initial links to ${userLinksKey}`
+        );
+      }
+    } catch (linksError) {
+      console.error("❌ Failed to save initial links:", linksError);
+    }
+
+    // 🔄 Update auth context
+    if (updateUser && typeof updateUser === "function") {
+      try {
+        updateUser(apiUser);
+        console.log("✅ Updated auth context with new user data");
+      } catch (contextError) {
+        console.error("❌ Failed to update auth context:", contextError);
       }
     }
 
     console.log("🎉 Onboarding completed successfully!");
-    console.log("🔗 Profile should be available at: /profile/" + profileData.username);
-
-    // Final verification before navigation
-    const finalUser = JSON.parse(localStorage.getItem("user") || "{}");
-    console.log("🏁 Final user state:", {
-      username: finalUser.username,
-      onboardingCompleted: finalUser.onboardingCompleted,
-      isPro: finalUser.isPro,
-    });
+    console.log(
+      "🔗 Profile should be available at: /profile/" + apiUser.username
+    );
 
     navigate("/dashboard?welcome=true");
   } catch (error) {
     console.error("❌ Error completing onboarding:", error);
-    setError(error.message || "Setup completed but with some limitations. You can continue to dashboard.");
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 3000);
+    setError(
+      error.message ||
+        "Setup failed. Please refresh the page and try again."
+    );
+  } finally {
+    setIsLoading(false);
   }
 };
+
 
   const renderStep1 = () => (
     <div className="space-y-6">
