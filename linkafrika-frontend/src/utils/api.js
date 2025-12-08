@@ -1,9 +1,10 @@
 import axios from "axios";
 
+// 🔹 Use one env var name consistently across the app
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://linkafrica.onrender.com/api";
+  import.meta.env.VITE_API_BASE_URL || "https://linkafrica.onrender.com/api";
 
-// Create axios instance
+// 🔐 Private axios instance (uses token)
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
@@ -12,31 +13,27 @@ const api = axios.create({
   },
 });
 
-// Add auth token to requests
+// ✅ Attach the SAME token key your AuthContext uses: "token"
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("linkafrika_token");
+    const token = localStorage.getItem("token"); // ⬅️ IMPORTANT
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Handle response errors (simplified - no automatic redirects)
+// Just pass errors through for now
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Just pass through errors without automatic handling
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Create a separate axios instance for auth requests (no interceptors)
-const authApi = axios.create({
+// 🌐 Separate public/auth client (NO auth header by default)
+const publicApi = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
@@ -44,22 +41,29 @@ const authApi = axios.create({
   },
 });
 
-// Auth API functions (using separate instance to avoid interceptor issues)
+/* ===========================
+   AUTH API (public client)
+   =========================== */
 export const authAPI = {
-  register: (userData) => authApi.post("/auth/register", userData),
-  login: (credentials) => authApi.post("/auth/login", credentials),
+  register: (userData) => publicApi.post("/auth/register", userData),
+  login: (credentials) => publicApi.post("/auth/login", credentials),
   checkUsername: (username) =>
-    authApi.post("/auth/check-username", { username }),
-  getMe: () => api.get("/auth/me"), // This one can use the main api since it needs auth
+    publicApi.post("/auth/check-username", { username }),
+  // This one needs auth, so use the private client
+  getMe: () => api.get("/auth/me"),
 };
 
-// User API functions
+/* ===========================
+   USER API (private)
+   =========================== */
 export const userAPI = {
   getProfile: () => api.get("/user/profile"),
   updateProfile: (profileData) => api.put("/user/profile", profileData),
 };
 
-// Links API functions
+/* ===========================
+   LINKS API (private)
+   =========================== */
 export const linksAPI = {
   getLinks: () => api.get("/links"),
   createLink: (linkData) => api.post("/links", linkData),
@@ -67,16 +71,20 @@ export const linksAPI = {
   deleteLink: (id) => api.delete(`/links/${id}`),
 };
 
-// Analytics API functions
+/* ===========================
+   ANALYTICS API (private)
+   =========================== */
 export const analyticsAPI = {
   trackEvent: (eventData) => api.post("/analytics/track", eventData),
   getStats: (days = 30) => api.get(`/analytics/stats?days=${days}`),
 };
 
-// Public API functions
+/* ===========================
+   PUBLIC API (no auth)
+   =========================== */
 export const publicAPI = {
-  getProfile: (username) => api.get(`/public/${username}`),
-  trackClick: (linkId) => api.post(`/public/click/${linkId}`),
+  getProfile: (username) => publicApi.get(`/public/${username}`),
+  trackClick: (linkId) => publicApi.post(`/public/click/${linkId}`),
 };
 
 export default api;
