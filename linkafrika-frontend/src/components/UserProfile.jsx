@@ -59,112 +59,134 @@ const UserProfile = () => {
   }, [username]);
 
   const loadUserProfile = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  try {
+    setLoading(true);
+    setError("");
 
-      console.log("🔍 Fetching public profile for:", username);
+    console.log("🔍 Fetching public profile for:", username);
 
-      const API_BASE_URL =
-        import.meta.env.VITE_API_BASE_URL ||
-        "https://linkafrica.onrender.com/api";
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL ||
+      "https://linkafrica.onrender.com/api";
 
-      const res = await fetch(`${API_BASE_URL}/public/${username}`);
+    const res = await fetch(`${API_BASE_URL}/public/${username}`);
 
-      console.log("🌍 /public response status:", res.status);
+    console.log("🌍 /public response status:", res.status);
 
-      if (!res.ok) {
-        if (res.status === 404) {
-          console.error(`❌ No user found with username: ${username}`);
-          setError("Profile not found");
-          return;
-        }
-        throw new Error(`Failed to load profile, status ${res.status}`);
+    if (!res.ok) {
+      if (res.status === 404) {
+        console.error(`❌ No user found with username: ${username}`);
+        setError("Profile not found");
+        return;
       }
-
-      const data = await res.json();
-
-      console.log("✅ Public profile data:", data);
-
-      // Set user state directly from API
-      const publicUser = {
-        id: data.id,
-        username: data.username,
-        displayName: data.displayName,
-        bio: data.bio,
-        avatarUrl: data.avatarUrl,
-        theme: data.theme || "purple",
-        isPro: data.isPro,
-        profileViews: data.profileViews,
-        followerCount: data.followerCount,
-      };
-      setUser(publicUser);
-
-      // 1️⃣ Links from backend
-      let links = Array.isArray(data.links)
-        ? data.links.map((l) => ({
-            ...l,
-            isActive: l.isActive ?? true, // default to true
-          }))
-        : [];
-
-      // 2️⃣ If backend has no links, FALL BACK to localStorage (same browser)
-      if (links.length === 0 && typeof window !== "undefined") {
-        console.log(
-          "⚠️ No links returned from backend, trying localStorage fallback..."
-        );
-
-        const possibleKeys = [
-          `links_${data.id}`,
-          `links_${data.username}`,
-          `links_${data.id || data.username}`,
-        ];
-
-        const uniqueKeys = [...new Set(possibleKeys)].filter(
-          (key) => key && key !== "links_undefined" && key !== "links_null"
-        );
-
-        console.log("🔑 Checking localStorage keys for links:", uniqueKeys);
-
-        for (const key of uniqueKeys) {
-          try {
-            const raw = localStorage.getItem(key);
-            if (!raw || raw === "[]") continue;
-
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              console.log(
-                `✅ Found ${parsed.length} links in localStorage under "${key}"`
-              );
-              links = parsed.map((l) => ({
-                ...l,
-                isActive: l.isActive ?? true,
-              }));
-              break;
-            }
-          } catch (e) {
-            console.error(`❌ Error reading links from "${key}":`, e);
-          }
-        }
-
-        if (!links.length) {
-          console.log("❌ No links found in fallback localStorage either.");
-        }
-      }
-
-      setUserLinks(links);
-      setUserProducts([]); // (reserved for future backend products)
-
-      console.log(
-        `✅ Profile loaded successfully for ${username} with ${links.length} links`
-      );
-    } catch (error) {
-      console.error("❌ Error loading user profile:", error);
-      setError("Failed to load profile");
-    } finally {
-      setLoading(false);
+      throw new Error(`Failed to load profile, status ${res.status}`);
     }
-  };
+
+    const data = await res.json();
+
+    console.log("✅ Public profile data:", data);
+
+    // Set user from public data
+    const publicUser = {
+      id: data.id,
+      username: data.username,
+      displayName: data.displayName,
+      bio: data.bio,
+      avatarUrl: data.avatarUrl,
+      theme: data.theme || "purple",
+      isPro: data.isPro,
+      profileViews: data.profileViews,
+      followerCount: data.followerCount,
+    };
+    setUser(publicUser);
+
+    // 1️⃣ Links from backend (if any)
+    let links = Array.isArray(data.links)
+      ? data.links.map((l) => ({
+          ...l,
+          isActive: l.isActive ?? true,
+        }))
+      : [];
+
+    // 2️⃣ If backend returns NO links, fall back to localStorage
+    if (links.length === 0 && typeof window !== "undefined") {
+      console.log(
+        "⚠️ No links returned from backend, trying localStorage fallback..."
+      );
+
+      const possibleKeys = [];
+
+      // Based on public data
+      if (data.id) possibleKeys.push(`links_${data.id}`);
+      if (data.username) possibleKeys.push(`links_${data.username}`);
+      if (data.id || data.username)
+        possibleKeys.push(`links_${data.id || data.username}`);
+
+      // 🔥 ALSO based on current session user (same browser)
+      try {
+        const rawSession = localStorage.getItem("user");
+        if (rawSession) {
+          const sessionUser = JSON.parse(rawSession);
+          console.log("👤 Session user for fallback:", {
+            id: sessionUser?.id,
+            email: sessionUser?.email,
+            username: sessionUser?.username,
+          });
+
+          if (sessionUser?.email)
+            possibleKeys.push(`links_${sessionUser.email}`);
+          if (sessionUser?.id) possibleKeys.push(`links_${sessionUser.id}`);
+        }
+      } catch (e) {
+        console.error("❌ Error reading session user from localStorage:", e);
+      }
+
+      const uniqueKeys = [...new Set(possibleKeys)].filter(
+        (key) => key && key !== "links_undefined" && key !== "links_null"
+      );
+
+      console.log("🔑 Checking localStorage keys for links:", uniqueKeys);
+
+      // Try each key until we find links
+      for (const key of uniqueKeys) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw || raw === "[]") continue;
+
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            console.log(
+              `✅ Found ${parsed.length} links in localStorage under "${key}"`
+            );
+            links = parsed.map((l) => ({
+              ...l,
+              isActive: l.isActive ?? true,
+            }));
+            break;
+          }
+        } catch (err) {
+          console.error(`❌ Error parsing links from "${key}":`, err);
+        }
+      }
+
+      if (!links.length) {
+        console.log("❌ No links found in fallback localStorage either.");
+      }
+    }
+
+    setUserLinks(links);
+    setUserProducts([]);
+
+    console.log(
+      `✅ Profile loaded successfully for ${username} with ${links.length} links`
+    );
+  } catch (error) {
+    console.error("❌ Error loading user profile:", error);
+    setError("Failed to load profile");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleLinkClick = async (link) => {
     try {
