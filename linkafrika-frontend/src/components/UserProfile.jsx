@@ -68,9 +68,13 @@ const UserProfile = () => {
 
     console.log("🔍 Fetching public profile for:", username);
 
-    // If you already use a custom API base URL, replace `/api/public/...`
-    // with that same base (e.g. https://linkafrica.onrender.com/api/public/${username})
-    const res = await fetch(`/api/public/${username}`);
+    // Use your backend base URL (Render) via env or fallback to local
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL || "https://linkafrica.onrender.com/api";
+
+    const res = await fetch(`${API_BASE_URL}/public/${username}`);
+
+    console.log("🌍 /public response status:", res.status);
 
     if (!res.ok) {
       if (res.status === 404) {
@@ -78,14 +82,11 @@ const UserProfile = () => {
         setError("Profile not found");
         return;
       }
-      throw new Error("Failed to load profile");
+      throw new Error(`Failed to load profile, status ${res.status}`);
     }
 
-    // Your /api/public/:username returns a single publicProfile object:
-    // {
-    //   id, username, displayName, bio, avatarUrl,
-    //   theme, isPro, profileViews, followerCount, links: [...]
-    // }
+    // Your /api/public/:username returns ONE object like:
+    // { id, username, displayName, bio, avatarUrl, theme, isPro, profileViews, followerCount, links: [...] }
     const data = await res.json();
 
     console.log("✅ Public profile data:", data);
@@ -97,7 +98,7 @@ const UserProfile = () => {
       displayName: data.displayName,
       bio: data.bio,
       avatarUrl: data.avatarUrl,
-      theme: data.theme,
+      theme: data.theme || "purple",
       isPro: data.isPro,
       profileViews: data.profileViews,
       followerCount: data.followerCount,
@@ -107,7 +108,7 @@ const UserProfile = () => {
     const links = Array.isArray(data.links) ? data.links : [];
     setUserLinks(links);
 
-    // You can later separate products if you start marking them on the backend
+    // For now, no separate products coming from backend
     setUserProducts([]);
 
     console.log(`✅ Profile loaded successfully for ${username}`);
@@ -118,6 +119,7 @@ const UserProfile = () => {
     setLoading(false);
   }
 };
+
 
 
   // UNIVERSAL LINKS LOADER - Add this function to Analytics.jsx
