@@ -759,6 +759,48 @@ app.post("/api/debug/clear", (req, res) => {
 });
 
 // ===================
+// MANUAL USERNAME SETTER (DEBUG)
+// ===================
+
+app.post("/api/debug/set-username", (req, res) => {
+  const { email, username } = req.body;
+
+  if (!email || !username) {
+    return res.status(400).json({
+      error: "email and username are required",
+    });
+  }
+
+  const userIndex = users.findIndex(
+    (u) => u.email.toLowerCase() === email.toLowerCase()
+  );
+
+  if (userIndex === -1) {
+    return res.status(404).json({
+      error: `No user found with email ${email}`,
+    });
+  }
+
+  users[userIndex].username = username.toLowerCase();
+  users[userIndex].updatedAt = new Date().toISOString();
+
+  // Save to file
+  if (saveData(USERS_FILE, users)) {
+    console.log(
+      `✅ Username set for ${email}: ${users[userIndex].username}`
+    );
+  }
+
+  const { password, ...userWithoutPassword } = users[userIndex];
+
+  res.json({
+    message: "Username updated successfully",
+    user: userWithoutPassword,
+  });
+});
+
+
+// ===================
 // ERROR HANDLING
 // ===================
 
