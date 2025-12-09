@@ -21,8 +21,8 @@ import {
 const nelsonData = {
   id: "nelson-creates",
   username: "nelsoncretes",
-  displayName: "Nelson Creates",
-  bio: "Digital Marketing Expert 📱 | Content Creator 🎨 | Helping businesses grow online 🚀",
+  displayName: "Nelson",
+  bio: "Full Stack Engineer 📱 | Content Creator 🎨 | Helping businesses grow online 🚀",
   theme: "purple",
   isPro: true,
   onboardingCompleted: true,
