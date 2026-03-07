@@ -23,7 +23,7 @@ const corsOptions = {
           "https://link-africa.vercel.app", // Your actual Vercel domain
           "https://linkafrica.vercel.app", // Backup domain
           "https://linkafrika.tech",
-          "https://www.linkafrika.tech
+          "https://www.linkafrika.tech"
           process.env.FRONTEND_URL,
         ]
       : [
