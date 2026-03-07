@@ -94,12 +94,15 @@ export const AuthProvider = ({ children }) => {
       console.log("✅ Login successful");
       return { success: true, user: loggedInUser };
     } catch (error) {
-      console.error("💥 Login error:", error);
-      const msg =
-        error?.response?.data?.message ||
-        "Login failed. Please check your credentials.";
-      return { success: false, error: msg };
-    } finally {
+  console.error("💥 Login error:", error.response?.data || error.message);
+
+  const msg =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    "Login failed. Please check your credentials.";
+
+  return { success: false, error: msg };
+} finally {
       setLoading(false);
     }
   };
@@ -121,12 +124,15 @@ export const AuthProvider = ({ children }) => {
       console.log("✅ Registration successful");
       return { success: true, message };
     } catch (error) {
-      console.error("💥 Registration error:", error);
-      const msg =
-        error?.response?.data?.message ||
-        "Registration failed. Please try again.";
-      return { success: false, error: msg };
-    } finally {
+  console.error("💥 Registration error:", error.response?.data || error.message);
+
+  const msg =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    "Registration failed. Please try again.";
+
+  return { success: false, error: msg };
+} finally {
       setLoading(false);
     }
   };
