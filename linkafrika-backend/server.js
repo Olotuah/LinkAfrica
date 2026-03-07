@@ -154,34 +154,32 @@ app.post("/api/auth/register", (req, res) => {
 
   if (!name || !email || !password) {
     return res.status(400).json({
-      error: "Name, email, and password are required",
+      message: "Name, email, and password are required",
     });
   }
 
   if (password.length < 6) {
     return res.status(400).json({
-      error: "Password must be at least 6 characters long",
+      message: "Password must be at least 6 characters long",
     });
   }
 
-  // Check for duplicate email
   const existingUser = users.find(
     (u) => u.email.toLowerCase() === email.toLowerCase()
   );
 
   if (existingUser) {
     return res.status(400).json({
-      error: "An account with this email already exists",
+      message: "An account with this email already exists",
     });
   }
 
-  // Create new user
   const newUser = {
     id: Date.now(),
     name: name.trim(),
     email: email.toLowerCase().trim(),
-    password, // In production, hash this with bcrypt!
-    username: null, // Will be set during onboarding
+    password,
+    username: null,
     displayName: name.trim(),
     bio: "",
     avatarUrl: "",
@@ -196,14 +194,11 @@ app.post("/api/auth/register", (req, res) => {
 
   users.push(newUser);
 
-  // Save to file
   if (saveData(USERS_FILE, users)) {
     console.log("✅ User data saved to file");
   }
 
   const token = `linkafrika-token-${newUser.id}-${Date.now()}`;
-
-  console.log("✅ User registered:", newUser.email);
 
   const { password: _, ...userWithoutPassword } = newUser;
 
