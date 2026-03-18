@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AnalyticsTracker from "../utils/analytics";
-import KemiCreatesProfile from "./NelsonCreatesProfile";
-import NelsonCreatesProfile from "./NelsonCreatesProfile"; // Import the Nelson profile
+import KemiCreatesProfile from "./KemiCreatesProfile";
+import NelsonCreatesProfile from "./NelsonCreatesProfile";
 import {
   ExternalLink,
   Instagram,
@@ -22,35 +22,31 @@ import {
 const UserProfile = () => {
   const { username } = useParams();
   const navigate = useNavigate();
+
   const [user, setUser] = useState(null);
   const [userLinks, setUserLinks] = useState([]);
   const [userProducts, setUserProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Handle special demo profiles
-  if (username === "kemicretes") {
+  // Demo profiles
+  if (username === "kemicreates") {
     return <KemiCreatesProfile />;
   }
 
-  if (username === "nelsoncretes") {
+  if (username === "nelsoncreates") {
     return <NelsonCreatesProfile />;
   }
 
-  // Used only for localStorage stats / link sync
-  const getUserKey = (user, prefix = "") => {
-    const identifier = user?.email || user?.id || user?.username;
+  const getUserKey = (userObj, prefix = "") => {
+    const identifier = userObj?.email || userObj?.id || userObj?.username;
 
     if (!identifier) {
-      console.error("❌ No identifier found for user key generation:", user);
+      console.error("❌ No identifier found for user key generation:", userObj);
       return null;
     }
 
-    const key = prefix ? `${prefix}_${identifier}` : identifier;
-
-    console.log(`🔑 Generated key: "${key}" from identifier: ${identifier}`);
-
-    return key;
+    return prefix ? `${prefix}_${identifier}` : identifier;
   };
 
   useEffect(() => {
@@ -59,139 +55,195 @@ const UserProfile = () => {
   }, [username]);
 
   const loadUserProfile = async () => {
-  try {
-    setLoading(true);
-    setError("");
+    try {
+      setLoading(true);
+      setError("");
 
-    console.log("🔍 Fetching public profile for:", username);
+      console.log("🔍 Fetching public profile for:", username);
 
-    const API_BASE_URL =
-      import.meta.env.VITE_API_BASE_URL ||
-      "https://linkafrica.onrender.com/api";
+      const API_BASE_URL =
+        import.meta.env.VITE_API_BASE_URL ||
+        "https://linkafrica.onrender.com/api";
 
-    const res = await fetch(`${API_BASE_URL}/public/${username}`);
+      const res = await fetch(`${API_BASE_URL}/public/${username}`);
 
-    console.log("🌍 /public response status:", res.status);
+      console.log("🌍 /public response status:", res.status);
 
-    if (!res.ok) {
-      if (res.status === 404) {
-        console.error(`❌ No user found with username: ${username}`);
-        setError("Profile not found");
-        return;
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.error(`❌ No user found with username: ${username}`);
+          setError("Profile not found");
+          return;
+        }
+        throw new Error(`Failed to load profile, status ${res.status}`);
       }
-      throw new Error(`Failed to load profile, status ${res.status}`);
-    }
 
-    const data = await res.json();
+      const data = await res.json();
+      console.log("✅ Public profile data:", data);
 
-    console.log("✅ Public profile data:", data);
+      const publicUser = {
+        id: data.id,
+        username: data.username,
+        displayName: data.displayName,
+        bio: data.bio,
+        avatarUrl: data.avatarUrl,
+        theme: data.theme || "purple",
+        isPro: data.isPro,
+        profileViews: data.profileViews,
+        followerCount: data.followerCount,
+        email: data.email,
+      };
 
-    // NOTE: include email if your backend sends it
-    const publicUser = {
-      id: data.id,
-      username: data.username,
-      displayName: data.displayName,
-      bio: data.bio,
-      avatarUrl: data.avatarUrl,
-      theme: data.theme || "purple",
-      isPro: data.isPro,
-      profileViews: data.profileViews,
-      followerCount: data.followerCount,
-      email: data.email, // 👈 IMPORTANT if available
-    };
-    setUser(publicUser);
+      setUser(publicUser);
 
-    // 1️⃣ Links from backend (if any)
-    let links = Array.isArray(data.links)
-      ? data.links.map((l) => ({
-          ...l,
-          isActive: l.isActive ?? true,
-        }))
-      : [];
+      // 1. Links from backend first
+      let links = Array.isArray(data.links)
+        ? data.links.map((l) => ({
+            ...l,
+            isActive: l.isActive ?? true,
+          }))
+        : [];
 
-    // 2️⃣ Fallback to localStorage if backend has no links
-    if (typeof window !== "undefined") {
-      if (links.length === 0) {
+      // 2. Fallback to localStorage for links if backend has none
+      if (typeof window !== "undefined" && links.length === 0) {
         console.log(
           "⚠️ No links returned from backend, trying localStorage fallback..."
         );
-      }
 
-      const possibleKeys = [];
+        const possibleLinkKeys = [];
 
-      // Based on public API data
-      if (data.id) possibleKeys.push(`links_${data.id}`);
-      if (data.username) possibleKeys.push(`links_${data.username}`);
-      if (data.id || data.username)
-        possibleKeys.push(`links_${data.id || data.username}`);
-      if (data.email) possibleKeys.push(`links_${data.email}`); // 👈 match Dashboard key if API returns email
-
-      // Based on current session user (Auth user in this browser)
-      try {
-        const rawSession = localStorage.getItem("user");
-        if (rawSession) {
-          const sessionUser = JSON.parse(rawSession);
-          console.log("👤 Session user for fallback:", {
-            id: sessionUser?.id,
-            email: sessionUser?.email,
-            username: sessionUser?.username,
-          });
-
-          if (sessionUser?.email)
-            possibleKeys.push(`links_${sessionUser.email}`);
-          if (sessionUser?.id) possibleKeys.push(`links_${sessionUser.id}`);
+        if (data.email) possibleLinkKeys.push(`links_${data.email}`);
+        if (data.id) possibleLinkKeys.push(`links_${data.id}`);
+        if (data.username) possibleLinkKeys.push(`links_${data.username}`);
+        if (data.id || data.username) {
+          possibleLinkKeys.push(`links_${data.id || data.username}`);
         }
-      } catch (e) {
-        console.error("❌ Error reading session user from localStorage:", e);
-      }
 
-      const uniqueKeys = [...new Set(possibleKeys)].filter(
-        (key) => key && key !== "links_undefined" && key !== "links_null"
-      );
-
-      console.log("🔑 Checking localStorage keys for links:", uniqueKeys);
-
-      // Try each key until we find links
-      for (const key of uniqueKeys) {
         try {
-          const raw = localStorage.getItem(key);
-          if (!raw || raw === "[]") continue;
+          const rawSession = localStorage.getItem("user");
+          if (rawSession) {
+            const sessionUser = JSON.parse(rawSession);
 
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log(
-              `✅ Found ${parsed.length} links in localStorage under "${key}"`
-            );
-            links = parsed.map((l) => ({
-              ...l,
-              isActive: l.isActive ?? true,
-            }));
-            break;
+            if (sessionUser?.email) {
+              possibleLinkKeys.push(`links_${sessionUser.email}`);
+            }
+            if (sessionUser?.id) {
+              possibleLinkKeys.push(`links_${sessionUser.id}`);
+            }
+            if (sessionUser?.username) {
+              possibleLinkKeys.push(`links_${sessionUser.username}`);
+            }
           }
-        } catch (err) {
-          console.error(`❌ Error parsing links from "${key}":`, err);
+        } catch (e) {
+          console.error("❌ Error reading session user from localStorage:", e);
+        }
+
+        const uniqueLinkKeys = [...new Set(possibleLinkKeys)].filter(
+          (key) => key && key !== "links_undefined" && key !== "links_null"
+        );
+
+        console.log("🔑 Checking localStorage keys for links:", uniqueLinkKeys);
+
+        for (const key of uniqueLinkKeys) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw || raw === "[]") continue;
+
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              console.log(
+                `✅ Found ${parsed.length} links in localStorage under "${key}"`
+              );
+              links = parsed.map((l) => ({
+                ...l,
+                isActive: l.isActive ?? true,
+              }));
+              break;
+            }
+          } catch (err) {
+            console.error(`❌ Error parsing links from "${key}":`, err);
+          }
+        }
+
+        if (!links.length) {
+          console.log("❌ No links found in any localStorage key.");
         }
       }
 
-      if (!links.length) {
-        console.log("❌ No links found in any localStorage key.");
+      // 3. Load products from localStorage
+      let products = [];
+
+      if (typeof window !== "undefined") {
+        const possibleProductKeys = [];
+
+        if (data.email) possibleProductKeys.push(`products_${data.email}`);
+        if (data.id) possibleProductKeys.push(`products_${data.id}`);
+        if (data.username) possibleProductKeys.push(`products_${data.username}`);
+
+        try {
+          const rawSession = localStorage.getItem("user");
+          if (rawSession) {
+            const sessionUser = JSON.parse(rawSession);
+
+            if (sessionUser?.email) {
+              possibleProductKeys.push(`products_${sessionUser.email}`);
+            }
+            if (sessionUser?.id) {
+              possibleProductKeys.push(`products_${sessionUser.id}`);
+            }
+            if (sessionUser?.username) {
+              possibleProductKeys.push(`products_${sessionUser.username}`);
+            }
+          }
+        } catch (e) {
+          console.error("❌ Error reading session user for products:", e);
+        }
+
+        const uniqueProductKeys = [...new Set(possibleProductKeys)].filter(
+          (key) => key && key !== "products_undefined" && key !== "products_null"
+        );
+
+        console.log(
+          "🛍️ Checking localStorage keys for products:",
+          uniqueProductKeys
+        );
+
+        for (const key of uniqueProductKeys) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw || raw === "[]") continue;
+
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              console.log(
+                `✅ Found ${parsed.length} products in localStorage under "${key}"`
+              );
+              products = parsed;
+              break;
+            }
+          } catch (err) {
+            console.error(`❌ Error parsing products from "${key}":`, err);
+          }
+        }
+
+        if (!products.length) {
+          console.log("❌ No products found in any localStorage key.");
+        }
       }
+
+      setUserLinks(links);
+      setUserProducts(products);
+
+      console.log(
+        `✅ Profile loaded successfully for ${username} with ${links.length} links and ${products.length} products`
+      );
+    } catch (err) {
+      console.error("❌ Error loading user profile:", err);
+      setError("Failed to load profile");
+    } finally {
+      setLoading(false);
     }
-
-    setUserLinks(links);
-    setUserProducts([]);
-
-    console.log(
-      `✅ Profile loaded successfully for ${username} with ${links.length} links`
-    );
-  } catch (error) {
-    console.error("❌ Error loading user profile:", error);
-    setError("Failed to load profile");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const handleLinkClick = async (link) => {
     try {
@@ -201,7 +253,6 @@ const UserProfile = () => {
         }`
       );
 
-      // Track click in analytics backend
       AnalyticsTracker.trackLinkClick(
         link.id,
         link.title,
@@ -209,13 +260,11 @@ const UserProfile = () => {
         user?.id || user?.email || user?.username
       );
 
-      // Update UI click count
       const updatedLinks = userLinks.map((l) =>
         l.id === link.id ? { ...l, clicks: (l.clicks || 0) + 1 } : l
       );
       setUserLinks(updatedLinks);
 
-      // Try update localStorage stats (owner-view)
       const userLinksKey = getUserKey(user, "links");
       if (userLinksKey && typeof window !== "undefined") {
         const allUserLinks = JSON.parse(
@@ -238,23 +287,15 @@ const UserProfile = () => {
           lastClickDate: new Date().toISOString(),
         };
         localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
-
-        console.log(
-          `✅ Click tracked: ${link.title} now has ${
-            (link.clicks || 0) + 1
-          } clicks`
-        );
-        console.log(`📊 User total clicks now: ${updatedStats.totalClicks}`);
       }
 
       window.open(link.url, "_blank");
-    } catch (error) {
-      console.error("❌ Error tracking click:", error);
+    } catch (err) {
+      console.error("❌ Error tracking click:", err);
       window.open(link.url, "_blank");
     }
   };
 
-  // Track profile view
   useEffect(() => {
     if (user && !loading && !error) {
       AnalyticsTracker.trackProfileView(
@@ -273,16 +314,12 @@ const UserProfile = () => {
           lastViewDate: new Date().toISOString(),
         };
         localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
-
-        console.log(
-          `👁️ Profile view tracked for ${username}: ${updatedStats.profileViews} total views`
-        );
       }
     }
   }, [user, loading, error, username]);
 
   const handleProductClick = (product) => {
-    console.log(`Product clicked: ${product.name}`);
+    console.log(`🛍️ Product clicked: ${product.name}`);
     if (product.paymentLink) {
       window.open(product.paymentLink, "_blank");
     } else {
@@ -295,8 +332,10 @@ const UserProfile = () => {
 
     if (navigator.share) {
       navigator.share({
-        title: `${user.displayName || user.name} - LinkAfrika`,
-        text: user.bio || `Check out ${user.displayName || user.name}'s links`,
+        title: `${user.displayName || user.username} - LinkAfrika`,
+        text:
+          user.bio ||
+          `Check out ${user.displayName || user.username}'s links and products`,
         url: profileUrl,
       });
     } else {
@@ -400,24 +439,21 @@ const UserProfile = () => {
   const themeBackground = getThemeBackground(user.theme);
 
   const sessionUser =
-  typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("user") || "null")
-    : null;
+    typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("user") || "null")
+      : null;
 
-const isOwnProfile =
-  sessionUser &&
-  (
-    (sessionUser.username &&
+  const isOwnProfile =
+    sessionUser &&
+    ((sessionUser.username &&
       user?.username &&
       sessionUser.username.toLowerCase() === user.username.toLowerCase()) ||
-    (sessionUser.email &&
-      user?.email &&
-      sessionUser.email.toLowerCase() === user.email.toLowerCase())
-  );
+      (sessionUser.email &&
+        user?.email &&
+        sessionUser.email.toLowerCase() === user.email.toLowerCase()));
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${themeBackground}`}>
-      {/* Header Actions */}
       <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-100 z-40">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <button
@@ -445,20 +481,19 @@ const isOwnProfile =
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-8">
-        {/* Profile Header */}
         <div className="text-center mb-8">
           <div
             className={`w-24 h-24 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}
           >
             <span className="text-white text-2xl font-bold">
-              {(user.displayName || user.name || user.username || "U")
+              {(user.displayName || user.username || "U")
                 .charAt(0)
                 .toUpperCase()}
             </span>
           </div>
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {user.displayName || user.name || username}
+            {user.displayName || username}
           </h1>
 
           {user.bio && (
@@ -483,49 +518,59 @@ const isOwnProfile =
           </div>
         </div>
 
-        {/* Products Section */}
         {userProducts.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <DollarSign className="w-5 h-5 text-green-500 mr-2" />
-              Digital Products & Services
-            </h2>
-            <div className="space-y-3">
+          <>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <DollarSign className="w-5 h-5 text-green-500 mr-2" />
+                Digital Products & Services
+              </h2>
+            </div>
+
+            <div className="mb-8 space-y-3">
               {userProducts.map((product) => (
-                <div
+                <button
                   key={product.id}
                   onClick={() => handleProductClick(product)}
-                  className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer"
+                  className="w-full bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-white/60 hover:shadow-lg hover:scale-[1.02] transition-all duration-200 text-left"
                 >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      {getProductTypeIcon(product.type)}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        {product.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-2">
-                        {product.description}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-green-600">
-                          ₦{parseInt(product.price).toLocaleString()}
-                        </span>
-                        <span className="text-sm text-gray-500 capitalize">
-                          {product.type}
-                        </span>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        {getProductTypeIcon(product.type)}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate">
+                          {product.name}
+                        </h3>
+
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-green-600 font-bold text-lg">
+                            ₦{parseInt(product.price || 0, 10).toLocaleString()}
+                          </p>
+
+                          <span className="text-xs text-gray-400 capitalize">
+                            {product.type}
+                          </span>
+                        </div>
+
+                        {product.description && (
+                          <p className="text-sm text-gray-500 truncate mt-1">
+                            {product.description}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <ExternalLink className="w-5 h-5 text-gray-400" />
+
+                    <ExternalLink className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
-          </div>
+          </>
         )}
 
-        {/* Links Section */}
         {userLinks.length > 0 ? (
           <div className="space-y-3 mb-8">
             {userLinks.map((link, index) => (
@@ -566,22 +611,19 @@ const isOwnProfile =
           </div>
         )}
 
-        
-
-        {/* Footer CTA */}
         {!isOwnProfile && (
-  <div className="text-center pt-8 border-t border-white/30">
-    <p className="text-gray-500 text-sm mb-4">
-      Create your own link-in-bio page
-    </p>
-    <button
-      onClick={() => navigate("/signup")}
-      className="bg-gradient-to-r from-orange-600 to-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-700 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
-    >
-      Create Your LinkAfrika Page
-    </button>
-  </div>
-)}
+          <div className="text-center pt-8 border-t border-white/30">
+            <p className="text-gray-500 text-sm mb-4">
+              Create your own link-in-bio page
+            </p>
+            <button
+              onClick={() => navigate("/signup")}
+              className="bg-gradient-to-r from-orange-600 to-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-700 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              Create Your LinkAfrika Page
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
