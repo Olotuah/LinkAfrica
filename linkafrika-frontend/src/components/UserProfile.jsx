@@ -30,11 +30,11 @@ const UserProfile = () => {
   const [error, setError] = useState("");
 
   // Demo profiles
-  if (username === "kemicreates") {
+  if (username === "kemicretes") {
     return <KemiCreatesProfile />;
   }
 
-  if (username === "nelsoncreates") {
+  if (username === "nelsoncretes") {
     return <NelsonCreatesProfile />;
   }
 
