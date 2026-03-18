@@ -87,53 +87,63 @@ const Analytics = () => {
   // FIXED: Replace your loadAnalytics function in Analytics.jsx with this:
 
   const loadAnalytics = async () => {
+  try {
+    setIsLoading(true);
+    console.log("📊 Loading analytics for user:", user?.email);
+
+    const analytics = await AnalyticsTracker.getAnalyticsData(
+      user?.id || user?.email,
+      parseInt(timeRange)
+    );
+
+    let loadedLinks = [];
+
+    // 1. Try backend first
     try {
-      setIsLoading(true);
-      console.log("📊 Loading analytics for user:", user?.email);
+      const linksResponse = await linksAPI.getLinks();
+      loadedLinks = Array.isArray(linksResponse.data) ? linksResponse.data : [];
+      console.log("✅ Links loaded from backend:", loadedLinks.length);
+    } catch (apiError) {
+      console.warn("⚠️ Backend links fetch failed, falling back to localStorage");
 
-      const analytics = await AnalyticsTracker.getAnalyticsData(
-        user?.id || user?.email,
-        parseInt(timeRange)
-      );
-
-      // FIXED: Load links using consistent key generation (same as Dashboard)
+      // 2. Fallback to localStorage
       const userLinksKey = getUserKey(user, "links");
-      let savedLinks = [];
 
       if (userLinksKey) {
-        savedLinks = JSON.parse(localStorage.getItem(userLinksKey) || "[]");
-        setLinks(savedLinks);
+        loadedLinks = JSON.parse(localStorage.getItem(userLinksKey) || "[]");
         console.log(
           `📦 Analytics links loaded from ${userLinksKey}:`,
-          savedLinks.length
+          loadedLinks.length
         );
       } else {
         console.error("❌ Could not generate user key for links");
-        setLinks([]);
+        loadedLinks = [];
       }
-
-      // FIXED: Calculate active/total links from actual data
-      const totalLinks = savedLinks.length;
-      const activeLinks = savedLinks.filter((link) => link.isActive).length;
-
-      // FIXED: Update stats with real link counts
-      const updatedStats = {
-        ...analytics,
-        totalLinks: totalLinks,
-        activeLinks: activeLinks,
-      };
-
-      setStats(updatedStats);
-
-      console.log("✅ Analytics loaded");
-      console.log(`📊 Links summary: ${activeLinks}/${totalLinks} active`);
-    } catch (error) {
-      console.error("❌ Error loading analytics:", error);
-      setStats(AnalyticsTracker.getEmptyAnalytics());
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    setLinks(loadedLinks);
+
+    const totalLinks = loadedLinks.length;
+    const activeLinks = loadedLinks.filter((link) => link.isActive).length;
+
+    const updatedStats = {
+      ...analytics,
+      totalLinks,
+      activeLinks,
+    };
+
+    setStats(updatedStats);
+
+    console.log("✅ Analytics loaded");
+    console.log(`📊 Links summary: ${activeLinks}/${totalLinks} active`);
+  } catch (error) {
+    console.error("❌ Error loading analytics:", error);
+    setStats(AnalyticsTracker.getEmptyAnalytics());
+    setLinks([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const exportData = () => {
     const data = {
@@ -450,10 +460,10 @@ const Analytics = () => {
             </h3>
             <div className="space-y-3">
               {links && links.length > 0 ? (
-                links
-                  .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
-                  .slice(0, 5)
-                  .map((link, index) => (
+  [...links]
+    .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
+    .slice(0, 5)
+    .map((link, index) => (
                     <div
                       key={link.id}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -541,10 +551,10 @@ const Analytics = () => {
                 <span className="text-gray-600">Most popular link</span>
                 <span className="font-medium truncate max-w-24">
                   {links && links.length > 0
-                    ? links.reduce((top, link) =>
-                        (link.clicks || 0) > (top.clicks || 0) ? link : top
-                      ).title
-                    : "No links"}
+  ? [...links].reduce((top, link) =>
+      (link?.clicks || 0) > (top?.clicks || 0) ? link : top
+    )?.title || "Untitled"
+  : "No links"}
                 </span>
               </div>
             </div>
