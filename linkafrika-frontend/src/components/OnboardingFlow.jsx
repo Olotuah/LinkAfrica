@@ -312,24 +312,22 @@ const OnboardingFlow = () => {
       );
 
       if (enabledLinks.length > 0) {
-        const userLinksKey = `links_${apiUser.id || apiUser.email}`;
-        const linksToSave = enabledLinks.map((link, index) => ({
-          id: Date.now() + index,
-          userId: apiUser.id || apiUser.email,
-          title: link.title,
-          url: link.url,
-          type: link.type,
-          description: `My ${link.title} profile`,
-          clicks: 0,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        }));
+  const userLinksKey = `links_${apiUser.email}`;
+  const linksToSave = enabledLinks.map((link, index) => ({
+    id: Date.now() + index,
+    userId: apiUser.email,
+    title: link.title,
+    url: link.url,
+    type: link.type,
+    description: `My ${link.title} profile`,
+    clicks: 0,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  }));
 
-        localStorage.setItem(userLinksKey, JSON.stringify(linksToSave));
-        console.log(
-          `✅ Saved ${linksToSave.length} initial links to ${userLinksKey}`
-        );
-      }
+  localStorage.setItem(userLinksKey, JSON.stringify(linksToSave));
+  console.log(`✅ Saved ${linksToSave.length} initial links to ${userLinksKey}`);
+}
     } catch (linksError) {
       console.error("❌ Failed to save initial links:", linksError);
     }
