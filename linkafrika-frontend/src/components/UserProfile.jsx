@@ -399,6 +399,22 @@ const UserProfile = () => {
   const themeGradient = getThemeGradient(user.theme);
   const themeBackground = getThemeBackground(user.theme);
 
+  const sessionUser =
+  typeof window !== "undefined"
+    ? JSON.parse(localStorage.getItem("user") || "null")
+    : null;
+
+const isOwnProfile =
+  sessionUser &&
+  (
+    (sessionUser.username &&
+      user?.username &&
+      sessionUser.username.toLowerCase() === user.username.toLowerCase()) ||
+    (sessionUser.email &&
+      user?.email &&
+      sessionUser.email.toLowerCase() === user.email.toLowerCase())
+  );
+
   return (
     <div className={`min-h-screen bg-gradient-to-br ${themeBackground}`}>
       {/* Header Actions */}
@@ -550,18 +566,22 @@ const UserProfile = () => {
           </div>
         )}
 
+        
+
         {/* Footer CTA */}
-        <div className="text-center pt-8 border-t border-white/30">
-          <p className="text-gray-500 text-sm mb-4">
-            Create your own link-in-bio page
-          </p>
-          <button
-            onClick={() => navigate("/signup")}
-            className="bg-gradient-to-r from-orange-600 to-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-700 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            Create Your LinkAfrika Page
-          </button>
-        </div>
+        {!isOwnProfile && (
+  <div className="text-center pt-8 border-t border-white/30">
+    <p className="text-gray-500 text-sm mb-4">
+      Create your own link-in-bio page
+    </p>
+    <button
+      onClick={() => navigate("/signup")}
+      className="bg-gradient-to-r from-orange-600 to-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-700 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
+    >
+      Create Your LinkAfrika Page
+    </button>
+  </div>
+)}
       </div>
     </div>
   );
