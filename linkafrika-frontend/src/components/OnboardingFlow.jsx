@@ -223,19 +223,10 @@ const OnboardingFlow = () => {
     console.log("🚀 Starting onboarding completion...");
     console.log("📝 Profile data to save:", profileData);
 
-    const API_BASE_URL =
-      import.meta.env.VITE_API_BASE_URL ||
-      "https://linkafrica.onrender.com/api";
-
-    const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("No auth token found. Please login again.");
-    }
-
     const updateData = {
-      username: profileData.username,          // e.g. "nelson"
-      displayName: profileData.displayName,
-      bio: profileData.bio,
+      username: profileData.username.trim().toLowerCase(),
+      displayName: profileData.displayName.trim(),
+      bio: profileData.bio.trim(),
       theme: profileData.theme,
       isPro: profileData.isPro,
       onboardingCompleted: true,
@@ -244,28 +235,18 @@ const OnboardingFlow = () => {
 
     console.log("📝 Sending profile update to backend:", updateData);
 
-    // 🔐 Update user on BACKEND (real source of truth for /api/public/:username)
-    const res = await fetch(`${API_BASE_URL}/user/profile`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // linkafrika-token-...
-      },
-      body: JSON.stringify(updateData),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      console.error("❌ Backend profile update failed:", res.status, errBody);
-      throw new Error(errBody.error || "Failed to update profile");
-    }
-
-    const result = await res.json();
+    // 1. Update profile in backend
+    const profileResponse = await userAPI.updateProfile(updateData);
+    const result = profileResponse.data;
     const apiUser = result.user || result;
+
+    if (!apiUser) {
+      throw new Error("Failed to retrieve updated user profile");
+    }
 
     console.log("✅ Backend profile updated:", apiUser);
 
-    // 🔄 Update localStorage "user"
+    // 2. Save updated user to localStorage
     try {
       localStorage.setItem("user", JSON.stringify(apiUser));
       console.log("✅ Saved updated user to localStorage:", apiUser);
@@ -273,7 +254,7 @@ const OnboardingFlow = () => {
       console.error("❌ Failed to save current user:", storageError);
     }
 
-    // 🧰 Optional: keep local "users" array in sync (for older logic / debug)
+    // 3. Keep optional local users array in sync
     try {
       let users = [];
       try {
@@ -305,34 +286,79 @@ const OnboardingFlow = () => {
       console.error("❌ Failed to sync local 'users' array:", usersError);
     }
 
-    // 💾 Save initial links locally (same as before – optional for now)
-    try {
-      const enabledLinks = initialLinks.filter(
-        (link) => link.enabled && link.url.trim()
-      );
+    // 4. Save onboarding links to backend first
+    const enabledLinks = initialLinks.filter(
+      (link) => link.enabled && link.url.trim()
+    );
 
-      if (enabledLinks.length > 0) {
-  const userLinksKey = `links_${apiUser.email}`;
-  const linksToSave = enabledLinks.map((link, index) => ({
-    id: Date.now() + index,
-    userId: apiUser.email,
-    title: link.title,
-    url: link.url,
-    type: link.type,
-    description: `My ${link.title} profile`,
-    clicks: 0,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-  }));
+    const createdLinks = [];
 
-  localStorage.setItem(userLinksKey, JSON.stringify(linksToSave));
-  console.log(`✅ Saved ${linksToSave.length} initial links to ${userLinksKey}`);
-}
-    } catch (linksError) {
-      console.error("❌ Failed to save initial links:", linksError);
+    for (const link of enabledLinks) {
+      const linkPayload = {
+        title: link.title,
+        url: link.url.trim(),
+        type: link.type,
+        description: `My ${link.title} profile`,
+      };
+
+      try {
+        const linkResponse = await linksAPI.createLink(linkPayload);
+        const createdLink = linkResponse.data?.link || linkPayload;
+        createdLinks.push(createdLink);
+        console.log(`✅ Created onboarding link in backend: ${link.title}`);
+      } catch (apiLinkError) {
+        console.warn(
+          `⚠️ Backend link creation failed for ${link.title}, saving locally instead`,
+          apiLinkError?.response?.data || apiLinkError.message
+        );
+
+        // fallback local save
+        createdLinks.push({
+          id: Date.now() + createdLinks.length,
+          userId: apiUser.email,
+          title: link.title,
+          url: link.url.trim(),
+          type: link.type,
+          description: `My ${link.title} profile`,
+          clicks: 0,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
 
-    // 🔄 Update auth context
+    // 5. Save created/fallback links to localStorage for dashboard consistency
+    try {
+      const userLinksKey = `links_${apiUser.email}`;
+      localStorage.setItem(userLinksKey, JSON.stringify(createdLinks));
+      console.log(
+        `✅ Saved ${createdLinks.length} onboarding links to ${userLinksKey}`
+      );
+    } catch (linksStorageError) {
+      console.error("❌ Failed to save onboarding links locally:", linksStorageError);
+    }
+
+    // 6. Initialize stats if needed
+    try {
+      const userStatsKey = `stats_${apiUser.email}`;
+      const existingStats = JSON.parse(localStorage.getItem(userStatsKey) || "{}");
+
+      const initialStats = {
+        profileViews: existingStats.profileViews || 0,
+        monthlyGrowth: existingStats.monthlyGrowth || 0,
+        earnings: existingStats.earnings || 0,
+        totalClicks: existingStats.totalClicks || 0,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      localStorage.setItem(userStatsKey, JSON.stringify(initialStats));
+      console.log(`✅ Initialized stats in ${userStatsKey}`);
+    } catch (statsError) {
+      console.error("❌ Failed to initialize stats:", statsError);
+    }
+
+    // 7. Update auth context
     if (updateUser && typeof updateUser === "function") {
       try {
         updateUser(apiUser);
@@ -343,17 +369,19 @@ const OnboardingFlow = () => {
     }
 
     console.log("🎉 Onboarding completed successfully!");
-    console.log(
-      "🔗 Profile should be available at: /profile/" + apiUser.username
-    );
+    console.log("🔗 Profile should be available at: /profile/" + apiUser.username);
 
     navigate("/dashboard?welcome=true");
   } catch (error) {
     console.error("❌ Error completing onboarding:", error);
-    setError(
+
+    const message =
+      error?.response?.data?.message ||
+      error?.response?.data?.error ||
       error.message ||
-        "Setup failed. Please refresh the page and try again."
-    );
+      "Setup failed. Please refresh the page and try again.";
+
+    setError(message);
   } finally {
     setIsLoading(false);
   }
