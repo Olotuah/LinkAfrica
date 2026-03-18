@@ -783,7 +783,7 @@ const Dashboard = () => {
             <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
               <Globe className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <span className="flex-1 text-gray-700 font-medium break-all sm:break-normal min-w-0">
-                link-africa.vercel.app/profile/
+                linkafrika.tech/profile/
                 {user?.username || user?.email || "yourprofile"}
               </span>
             </div>
