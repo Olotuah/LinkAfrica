@@ -65,6 +65,16 @@ export const linksAPI = {
 };
 
 /* ============================
+   PRODUCTS (private)
+   ============================ */
+
+export const productsAPI = {
+  getProducts: () => api.get("/products"),
+  createProduct: (data) => api.post("/products", data),
+  deleteProduct: (id) => api.delete(`/products/${id}`),
+};
+
+/* ============================
    ANALYTICS (private)
    ============================ */
 export const analyticsAPI = {
