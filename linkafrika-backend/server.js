@@ -322,11 +322,13 @@ app.put("/api/user/profile", authenticateToken, (req, res) => {
   }
 
   // If username is being updated, check availability
-  if (username && username !== req.user.username) {
+  if (username && username.trim().toLowerCase() !== (req.user.username || "").toLowerCase()) {
+    const cleanUsername = username.trim().toLowerCase();
+
     const existingUser = users.find(
       (u) =>
         u.username &&
-        u.username.toLowerCase() === username.toLowerCase() &&
+        u.username.toLowerCase() === cleanUsername &&
         u.id !== req.user.id
     );
 
@@ -340,11 +342,11 @@ app.put("/api/user/profile", authenticateToken, (req, res) => {
   // Update user
   users[userIndex] = {
     ...users[userIndex],
-    ...(username !== undefined && { username: username.toLowerCase() }),
+    ...(username !== undefined && { username: username.trim().toLowerCase() }),
     ...(displayName !== undefined && { displayName: displayName.trim() }),
-    ...(bio !== undefined && { bio }),
+    ...(bio !== undefined && { bio: bio.trim() }),
     ...(theme !== undefined && { theme }),
-    ...(avatarUrl !== undefined && { avatarUrl }),
+    ...(avatarUrl !== undefined && { avatarUrl: avatarUrl.trim() }),
     ...(onboardingCompleted !== undefined && { onboardingCompleted }),
     ...(isPro !== undefined && { isPro }),
     updatedAt: new Date().toISOString(),
