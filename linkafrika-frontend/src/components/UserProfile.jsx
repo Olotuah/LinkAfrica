@@ -1,224 +1,188 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; // ✅ ADDED
-import AnalyticsTracker from "../utils/analytics";
-import { uploadImageToCloudinary } from "../utils/cloudinaryUpload"; // ✅ ADDED
-import { userAPI } from "../utils/api"; // ✅ ADDED
-import KemiCreatesProfile from "./NelsonCreatesProfile";
-import NelsonCreatesProfile from "./NelsonCreatesProfile";
-import {
-  ExternalLink,
-  Instagram,
-  Youtube,
-  MessageCircle,
-  Globe,
-  DollarSign,
-  BookOpen,
-  Headphones,
-  Users,
-  Eye,
-  ArrowLeft,
-  Share,
-  Briefcase,
-  X,
-  Image as ImageIcon,
-} from "lucide-react";
+llex items-center space-x-1">  
+          <span>📍</span>  
+          <span>Nigeria</span>  
+        </div>  
+        <div className="flex items-center space-x-1">  
+          <span>🔗</span>  
+          <span>{userLinks.length} links</span>  
+        </div>  
+        {userProducts.length > 0 && (  
+          <div className="flex items-center space-x-1">  
+            <span>🛍️</span>  
+            <span>{userProducts.length} products</span>  
+          </div>  
+        )}  
+      </div>  
+    </div>  
 
-const UserProfile = () => {
-  const { username } = useParams();
-  const navigate = useNavigate();
-  const { user: currentUser } = useAuth(); // ✅ ADDED
+    {userProducts.length > 0 && (  
+      <>  
+        <div className="mb-4">  
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">  
+            <DollarSign className="w-5 h-5 text-green-500 mr-2" />  
+            Digital Products & Services  
+          </h2>  
+        </div>  
 
-  const [user, setUser] = useState(null);
-  const [userLinks, setUserLinks] = useState([]);
-  const [userProducts, setUserProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+        <div className="mb-8 space-y-3">  
+          {userProducts.map((product) => (  
+            <div  
+              key={product.id}  
+              className="w-full bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-white/60 shadow-sm"  
+            >  
+              <div className="flex items-start gap-4">  
+                <button  
+                  type="button"  
+                  onClick={() =>  
+                    product.imageUrl &&  
+                    openImagePreview(product.imageUrl, product.name)  
+                  }  
+                  className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 border hover:opacity-90 transition"  
+                >  
+                  {product.imageUrl ? (  
+                    <img  
+                      src={product.imageUrl}  
+                      alt={product.name}  
+                      className="w-full h-full object-cover"  
+                    />  
+                  ) : (  
+                    <div className="w-full h-full flex items-center justify-center bg-green-50">  
+                      <ImageIcon className="w-6 h-6 text-green-500" />  
+                    </div>  
+                  )}  
+                </button>  
 
-  const [previewImage, setPreviewImage] = useState(null);
-  const [previewTitle, setPreviewTitle] = useState("");
+                <div  
+                  className="flex-1 min-w-0 cursor-pointer"  
+                  onClick={() => handleProductClick(product)}  
+                >  
+                  <div className="flex items-start justify-between gap-3">  
+                    <div className="min-w-0">  
+                      <h3 className="font-semibold text-gray-900 truncate">  
+                        {product.name}  
+                      </h3>  
+                      <div className="flex items-center gap-2 mt-1">  
+                        <span className="text-green-600 font-bold text-lg">  
+                          ₦  
+                          {parseInt(  
+                            product.price || 0,  
+                            10  
+                          ).toLocaleString()}  
+                        </span>  
+                        <span className="text-xs text-gray-400 capitalize">  
+                          {product.type}  
+                        </span>  
+                      </div>  
+                    </div>  
 
-  // ✅ KEEP YOUR ORIGINAL NAMES
-  if (username === "kemicretes") {
-    return <KemiCreatesProfile />;
-  }
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">  
+                      {getProductTypeIcon(product.type)}  
+                    </div>  
+                  </div>  
 
-  if (username === "nelsoncretes") {
-    return <NelsonCreatesProfile />;
-  }
+                  {product.description && (  
+                    <p className="text-sm text-gray-500 mt-2 line-clamp-2">  
+                      {product.description}  
+                    </p>  
+                  )}  
 
-  // ✅ NEW OWNER LOGIC
-  const isOwner =
-    currentUser &&
-    user &&
-    (currentUser.username === user.username ||
-      currentUser.email === user.email);
+                  <div className="mt-3 flex justify-between items-center">  
+                    <span className="text-xs text-gray-400">  
+                      Tap to open product  
+                    </span>  
+                    <ExternalLink className="w-4 h-4 text-gray-400" />  
+                  </div>  
+                </div>  
+              </div>  
+            </div>  
+          ))}  
+        </div>  
+      </>  
+    )}  
 
-  useEffect(() => {
-    loadUserProfile();
-  }, [username]);
+    {userLinks.length > 0 ? (  
+      <div className="space-y-3 mb-8">  
+        {userLinks.map((link, index) => (  
+          <button  
+            key={link.id}  
+            onClick={() => handleLinkClick(link)}  
+            className={`w-full p-4 bg-gradient-to-r ${getLinkColor(  
+              link.type,  
+              index  
+            )} text-white rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200 flex items-center justify-between group`}  
+          >  
+            <div className="flex items-center space-x-4">  
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">  
+                {getLinkTypeIcon(link.type)}  
+              </div>  
+              <div className="text-left">  
+                <div className="font-semibold">{link.title}</div>  
+                <div className="text-sm opacity-75">  
+                  {link.clicks || 0} clicks  
+                </div>  
+              </div>  
+            </div>  
+            <ExternalLink className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />  
+          </button>  
+        ))}  
+      </div>  
+    ) : (  
+      <div className="text-center py-12">  
+        <div className="w-16 h-16 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">  
+          <Globe className="w-8 h-8 text-gray-400" />  
+        </div>  
+        <h3 className="text-lg font-medium text-gray-900 mb-2">  
+          No Links Yet  
+        </h3>  
+        <p className="text-gray-600 mb-6">  
+          This user hasn't added any links to their profile yet.  
+        </p>  
+      </div>  
+    )}  
 
-  const loadUserProfile = async () => {
-    try {
-      setLoading(true);
-      setError("");
+    {!isOwnProfile && (  
+      <div className="text-center pt-8 border-t border-white/30">  
+        <p className="text-gray-500 text-sm mb-4">  
+          Create your own link-in-bio page  
+        </p>  
+        <button  
+          onClick={() => navigate("/signup")}  
+          className="bg-gradient-to-r from-orange-600 to-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-700 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"  
+        >  
+          Create Your LinkAfrika Page  
+        </button>  
+      </div>  
+    )}  
+  </div>  
 
-      const API_BASE_URL =
-        import.meta.env.VITE_API_BASE_URL ||
-        "https://linkafrica.onrender.com/api";
+  {previewImage && (  
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">  
+      <div className="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl">  
+        <div className="flex items-center justify-between px-4 py-3 border-b">  
+          <h3 className="font-semibold text-gray-900 truncate">  
+            {previewTitle}  
+          </h3>  
+          <button  
+            onClick={closeImagePreview}  
+            className="p-2 rounded-lg hover:bg-gray-100 transition"  
+          >  
+            <X className="w-5 h-5 text-gray-600" />  
+          </button>  
+        </div>  
 
-      const res = await fetch(`${API_BASE_URL}/public/${username}`);
+        <div className="bg-gray-50 flex items-center justify-center p-4">  
+          <img  
+            src={previewImage}  
+            alt={previewTitle}  
+            className="max-h-[70vh] w-auto object-contain rounded-xl"  
+          />  
+        </div>  
+      </div>  
+    </div>  
+  )}  
+</div>
 
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError("Profile not found");
-          return;
-        }
-        throw new Error(`Failed to load profile`);
-      }
-
-      const data = await res.json();
-
-      const publicUser = {
-        id: data.id,
-        username: data.username,
-        displayName: data.displayName,
-        bio: data.bio,
-        avatarUrl: data.avatarUrl || "",
-        theme: data.theme || "purple",
-        isPro: data.isPro,
-        profileViews: data.profileViews,
-        followerCount: data.followerCount,
-        email: data.email || "",
-      };
-
-      setUser(publicUser);
-      setUserLinks(data.links || []);
-      setUserProducts(data.products || []);
-    } catch (err) {
-      console.error("❌ Error loading user profile:", err);
-      setError("Failed to load profile");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✅ NEW FUNCTION (CORRECT POSITION)
-  const handleAvatarUpload = async (e) => {
-    try {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const uploaded = await uploadImageToCloudinary(
-        file,
-        "linkafrika/profile-pictures"
-      );
-
-      const avatarUrl = uploaded.secure_url;
-
-      const res = await userAPI.updateProfile({ avatarUrl });
-
-      const updatedUser = res.data?.user;
-
-      if (updatedUser) {
-        setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-      }
-
-      console.log("✅ Avatar updated");
-    } catch (error) {
-      console.error("❌ Upload failed:", error);
-    }
-  };
-
-  const handleLinkClick = async (link) => {
-    try {
-      AnalyticsTracker.trackLinkClick(
-        link.id,
-        link.title,
-        link.url,
-        user?.id || user?.email || user?.username
-      );
-
-      window.open(link.url, "_blank");
-    } catch (err) {
-      window.open(link.url, "_blank");
-    }
-  };
-
-  useEffect(() => {
-    if (user && !loading && !error) {
-      AnalyticsTracker.trackProfileView(
-        user?.id || user?.email || user?.username,
-        "direct"
-      );
-    }
-  }, [user, loading, error]);
-
-  const handleProductClick = (product) => {
-    if (product.paymentLink) {
-      window.open(product.paymentLink, "_blank");
-    }
-  };
-
-  const openImagePreview = (imageUrl, title) => {
-    setPreviewImage(imageUrl);
-    setPreviewTitle(title || "Product image");
-  };
-
-  const closeImagePreview = () => {
-    setPreviewImage(null);
-    setPreviewTitle("");
-  };
-
-  const shareProfile = () => {
-    const profileUrl = `${window.location.origin}/profile/${username}`;
-    navigator.clipboard.writeText(profileUrl);
-    alert("Profile link copied!");
-  };
-
-  const themeGradient = "from-purple-500 to-pink-500";
-  const themeBackground = "from-purple-100 via-pink-50 to-purple-100";
-
-  if (loading) return <div className="text-center py-20">Loading...</div>;
-  if (error || !user) return <div>{error}</div>;
-
-  return (
-    <div className={`min-h-screen bg-gradient-to-br ${themeBackground}`}>
-      <div className="max-w-lg mx-auto px-4 py-8 text-center">
-
-        {/* ✅ UPDATED AVATAR SECTION */}
-        <div className="relative w-24 h-24 mx-auto mb-4">
-          {user.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow"
-            />
-          ) : (
-            <div className={`w-24 h-24 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center`}>
-              <span className="text-white text-2xl font-bold">
-                {(user.displayName || user.username || "U")[0]}
-              </span>
-            </div>
-          )}
-
-          {/* ✅ OWNER ONLY BUTTON */}
-          {isOwner && (
-            <label className="absolute bottom-0 right-0 bg-black text-white p-2 rounded-full cursor-pointer">
-              📷
-              <input
-                type="file"
-                className="hidden"
-                onChange={handleAvatarUpload}
-              />
-            </label>
-          )}
-        </div>
-
-        <h1>{user.displayName}</h1>
-      </div>
-    </div>
-  );
+);
 };
 
 export default UserProfile;
