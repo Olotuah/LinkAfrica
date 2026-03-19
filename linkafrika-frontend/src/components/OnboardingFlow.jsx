@@ -230,15 +230,13 @@ const OnboardingFlow = () => {
       theme: profileData.theme,
       isPro: profileData.isPro,
       onboardingCompleted: true,
-      updatedAt: new Date().toISOString(),
     };
 
     console.log("📝 Sending profile update to backend:", updateData);
 
     // 1. Update profile in backend
     const profileResponse = await userAPI.updateProfile(updateData);
-    const result = profileResponse.data;
-    const apiUser = result.user || result;
+    const apiUser = profileResponse.data?.user;
 
     if (!apiUser) {
       throw new Error("Failed to retrieve updated user profile");
@@ -246,54 +244,22 @@ const OnboardingFlow = () => {
 
     console.log("✅ Backend profile updated:", apiUser);
 
-    // 2. Save updated user to localStorage
-    try {
-      localStorage.setItem("user", JSON.stringify(apiUser));
-      console.log("✅ Saved updated user to localStorage:", apiUser);
-    } catch (storageError) {
-      console.error("❌ Failed to save current user:", storageError);
+    // 2. Update auth context + localStorage user
+    if (updateUser && typeof updateUser === "function") {
+      updateUser(apiUser);
     }
 
-    // 3. Keep optional local users array in sync
-    try {
-      let users = [];
-      try {
-        users = JSON.parse(localStorage.getItem("users") || "[]");
-      } catch (e) {
-        console.warn("Invalid users data, starting fresh:", e);
-        users = [];
-      }
+    localStorage.setItem("user", JSON.stringify(apiUser));
 
-      const idx = users.findIndex(
-        (u) =>
-          u.id === apiUser.id ||
-          (u.email &&
-            apiUser.email &&
-            u.email.toLowerCase() === apiUser.email.toLowerCase())
-      );
-
-      if (idx !== -1) {
-        users[idx] = { ...users[idx], ...apiUser };
-        console.log("🔄 Updated existing user in local 'users' at index:", idx);
-      } else {
-        users.push(apiUser);
-        console.log("➕ Added user to local 'users' array");
-      }
-
-      localStorage.setItem("users", JSON.stringify(users));
-      console.log("💾 Saved local 'users' array with", users.length, "users");
-    } catch (usersError) {
-      console.error("❌ Failed to sync local 'users' array:", usersError);
-    }
-
-    // 4. Save onboarding links to backend first
+    // 3. Create onboarding links in backend only
     const enabledLinks = initialLinks.filter(
       (link) => link.enabled && link.url.trim()
     );
 
-    const createdLinks = [];
+    // Free users can only have 3 links
+    const linksToCreate = apiUser.isPro ? enabledLinks : enabledLinks.slice(0, 3);
 
-    for (const link of enabledLinks) {
+    for (const link of linksToCreate) {
       const linkPayload = {
         title: link.title,
         url: link.url.trim(),
@@ -301,76 +267,11 @@ const OnboardingFlow = () => {
         description: `My ${link.title} profile`,
       };
 
-      try {
-        const linkResponse = await linksAPI.createLink(linkPayload);
-        const createdLink = linkResponse.data?.link || linkPayload;
-        createdLinks.push(createdLink);
-        console.log(`✅ Created onboarding link in backend: ${link.title}`);
-      } catch (apiLinkError) {
-        console.warn(
-          `⚠️ Backend link creation failed for ${link.title}, saving locally instead`,
-          apiLinkError?.response?.data || apiLinkError.message
-        );
-
-        // fallback local save
-        createdLinks.push({
-          id: Date.now() + createdLinks.length,
-          userId: apiUser.email,
-          title: link.title,
-          url: link.url.trim(),
-          type: link.type,
-          description: `My ${link.title} profile`,
-          clicks: 0,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    }
-
-    // 5. Save created/fallback links to localStorage for dashboard consistency
-    try {
-      const userLinksKey = `links_${apiUser.email}`;
-      localStorage.setItem(userLinksKey, JSON.stringify(createdLinks));
-      console.log(
-        `✅ Saved ${createdLinks.length} onboarding links to ${userLinksKey}`
-      );
-    } catch (linksStorageError) {
-      console.error("❌ Failed to save onboarding links locally:", linksStorageError);
-    }
-
-    // 6. Initialize stats if needed
-    try {
-      const userStatsKey = `stats_${apiUser.email}`;
-      const existingStats = JSON.parse(localStorage.getItem(userStatsKey) || "{}");
-
-      const initialStats = {
-        profileViews: existingStats.profileViews || 0,
-        monthlyGrowth: existingStats.monthlyGrowth || 0,
-        earnings: existingStats.earnings || 0,
-        totalClicks: existingStats.totalClicks || 0,
-        lastUpdated: new Date().toISOString(),
-      };
-
-      localStorage.setItem(userStatsKey, JSON.stringify(initialStats));
-      console.log(`✅ Initialized stats in ${userStatsKey}`);
-    } catch (statsError) {
-      console.error("❌ Failed to initialize stats:", statsError);
-    }
-
-    // 7. Update auth context
-    if (updateUser && typeof updateUser === "function") {
-      try {
-        updateUser(apiUser);
-        console.log("✅ Updated auth context with new user data");
-      } catch (contextError) {
-        console.error("❌ Failed to update auth context:", contextError);
-      }
+      await linksAPI.createLink(linkPayload);
+      console.log(`✅ Created onboarding link in backend: ${link.title}`);
     }
 
     console.log("🎉 Onboarding completed successfully!");
-    console.log("🔗 Profile should be available at: /profile/" + apiUser.username);
-
     navigate("/dashboard?welcome=true");
   } catch (error) {
     console.error("❌ Error completing onboarding:", error);
