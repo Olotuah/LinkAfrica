@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 import User from "./models/User.js";
 import Link from "./models/Link.js";
 import Product from "./models/Product.js";
-import { auth } from "./middleware/auth.js";
+import { auth } from "./src/middleware/auth.js";
 
 config();
 
