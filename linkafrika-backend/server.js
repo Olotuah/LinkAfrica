@@ -518,7 +518,7 @@ app.get("/api/products", authenticateToken, (req, res) => {
 app.post("/api/products", authenticateToken, (req, res) => {
   console.log("🛍️ Create product request:", req.body);
 
-  const { type, name, price, description, paymentLink } = req.body;
+  const { type, name, price, description, paymentLink, imageUrl } = req.body;
 
   if (!name || !price) {
     return res.status(400).json({
@@ -540,6 +540,7 @@ app.post("/api/products", authenticateToken, (req, res) => {
     price: Number(price),
     description: description ? description.trim() : "",
     paymentLink: paymentLink ? paymentLink.trim() : "",
+    imageUrl: imageUrl ? imageUrl.trim() : "",
     isActive: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -556,6 +557,45 @@ app.post("/api/products", authenticateToken, (req, res) => {
   res.status(201).json({
     message: "Product created successfully",
     product: newProduct,
+  });
+});
+
+// Update product
+app.put("/api/products/:id", authenticateToken, (req, res) => {
+  const productId = parseInt(req.params.id);
+
+  const productIndex = products.findIndex(
+    (product) => product.id === productId && product.userId === req.user.id
+  );
+
+  if (productIndex === -1) {
+    return res.status(404).json({ message: "Product not found" });
+  }
+
+  const { type, name, price, description, paymentLink, imageUrl, isActive } =
+    req.body;
+
+  products[productIndex] = {
+    ...products[productIndex],
+    ...(type !== undefined && { type }),
+    ...(name !== undefined && { name: name.trim() }),
+    ...(price !== undefined && { price: Number(price) }),
+    ...(description !== undefined && { description: description.trim() }),
+    ...(paymentLink !== undefined && { paymentLink: paymentLink.trim() }),
+    ...(imageUrl !== undefined && { imageUrl: imageUrl.trim() }),
+    ...(isActive !== undefined && { isActive }),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (saveData(PRODUCTS_FILE, products)) {
+    console.log("✅ Products data saved to file");
+  }
+
+  console.log("✅ Product updated:", products[productIndex].name);
+
+  res.json({
+    message: "Product updated successfully",
+    product: products[productIndex],
   });
 });
 
@@ -677,12 +717,10 @@ app.get("/api/public/:username", (req, res) => {
 
   console.log("🌍 Public profile request for:", username);
 
-  // Look for user by username first, then by email as fallback
   let user = users.find(
     (u) => u.username && u.username.toLowerCase() === username.toLowerCase()
   );
 
-  // If not found by username, try email (for backward compatibility)
   if (!user) {
     user = users.find((u) => u.email.toLowerCase() === username.toLowerCase());
   }
@@ -691,23 +729,21 @@ app.get("/api/public/:username", (req, res) => {
     return res.status(404).json({ error: "Profile not found" });
   }
 
-  // Get user's active links
   const userLinks = links
     .filter((link) => link.userId === user.id && link.isActive)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   const userProducts = products
-  .filter((product) => product.userId === user.id && product.isActive)
-  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    .filter((product) => product.userId === user.id && product.isActive)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  // Increment profile views
   const userIndex = users.findIndex((u) => u.id === user.id);
   if (userIndex !== -1) {
     users[userIndex].profileViews = (users[userIndex].profileViews || 0) + 1;
     saveData(USERS_FILE, users);
+    user = users[userIndex];
   }
 
-  // Public profile data (no sensitive info)
   const publicProfile = {
     id: user.id,
     username: user.username || user.email.split("@")[0],
@@ -718,6 +754,7 @@ app.get("/api/public/:username", (req, res) => {
     isPro: user.isPro || false,
     profileViews: user.profileViews || 0,
     followerCount: user.followerCount || 0,
+    email: user.email,
     links: userLinks.map((link) => ({
       id: link.id,
       title: link.title,
@@ -725,18 +762,24 @@ app.get("/api/public/:username", (req, res) => {
       type: link.type,
       description: link.description,
       clicks: link.clicks,
+      isActive: link.isActive,
     })),
     products: userProducts.map((product) => ({
-  id: product.id,
-  type: product.type,
-  name: product.name,
-  price: product.price,
-  description: product.description,
-  paymentLink: product.paymentLink,
-})),
+      id: product.id,
+      type: product.type,
+      name: product.name,
+      price: product.price,
+      description: product.description,
+      paymentLink: product.paymentLink,
+      imageUrl: product.imageUrl || "",
+      isActive: product.isActive,
+      createdAt: product.createdAt,
+    })),
   };
 
-  console.log("✅ Public profile served for:", user.email);
+  console.log(
+    `✅ Public profile served for ${user.email} with ${userLinks.length} links and ${userProducts.length} products`
+  );
 
   res.json(publicProfile);
 });
