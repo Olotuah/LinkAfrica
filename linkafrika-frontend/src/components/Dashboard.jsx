@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { linksAPI, analyticsAPI } from "../utils/api";
+import { linksAPI, analyticsAPI, productsAPI } from "../utils/api";
 import {
   Plus,
   Edit3,
@@ -207,120 +207,45 @@ const Dashboard = () => {
 
   // FIXED: Load dashboard data with consistent key generation
   const loadDashboardData = async () => {
-    try {
-      setIsLoading(true);
-      setError("");
+  try {
+    setIsLoading(true);
+    setError("");
 
-      console.log("📊 Loading dashboard data for user:", user?.email);
+    console.log("📊 Loading dashboard data for user:", user?.email);
 
-      // IMPORTANT: Migrate any old data before loading
-      migrateUserData(user);
+    const [linksResponse, statsResponse, productsResponse] = await Promise.all([
+      linksAPI.getLinks(),
+      analyticsAPI.getStats(30),
+      productsAPI.getProducts(),
+    ]);
 
-      // Debug the current state
-      debugProductsPersistence(user);
+    const fetchedLinks = Array.isArray(linksResponse.data) ? linksResponse.data : [];
+    const fetchedProducts = Array.isArray(productsResponse.data)
+      ? productsResponse.data
+      : [];
 
-      try {
-        const [linksResponse, statsResponse] = await Promise.all([
-          linksAPI.getLinks(),
-          analyticsAPI.getStats(30),
-        ]);
+    setUserLinks(fetchedLinks);
+    setUserProducts(fetchedProducts);
 
-        setUserLinks(linksResponse.data);
-        setStats({
-          ...statsResponse.data,
-          totalLinks: linksResponse.data.length,
-          activeLinks: linksResponse.data.filter((link) => link.isActive)
-            .length,
-        });
+    setStats({
+      ...statsResponse.data,
+      totalLinks: fetchedLinks.length,
+      activeLinks: fetchedLinks.filter((link) => link.isActive).length,
+    });
 
-        // FIXED: Use consistent key generation
-        const userProductsKey = getUserKey(user, "products");
-        const savedProducts = JSON.parse(
-          localStorage.getItem(userProductsKey) || "[]"
-        );
-        setUserProducts(savedProducts);
-        console.log(
-          `📦 Products loaded from ${userProductsKey}:`,
-          savedProducts.length
-        );
-      } catch (apiError) {
-        console.log("⚠️ API not available, loading from localStorage...");
-
-        // FIXED: Use consistent key generation for all data
-        const userLinksKey = getUserKey(user, "links");
-        const userProductsKey = getUserKey(user, "products");
-        const userStatsKey = getUserKey(user, "stats");
-
-        const savedLinks = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
-        const savedProducts = JSON.parse(
-          localStorage.getItem(userProductsKey) || "[]"
-        );
-        const savedStats = JSON.parse(
-          localStorage.getItem(userStatsKey) || "{}"
-        );
-
-        console.log(`📦 Loading data with consistent keys:`);
-        console.log(`- Links (${userLinksKey}):`, savedLinks.length);
-        console.log(`- Products (${userProductsKey}):`, savedProducts.length);
-        console.log(`- Stats (${userStatsKey}):`, savedStats);
-
-        setUserLinks(savedLinks);
-        setUserProducts(savedProducts);
-
-        // Calculate and persist stats properly
-        const totalClicks = savedLinks.reduce(
-          (sum, link) => sum + (link.clicks || 0),
-          0
-        );
-        const profileViews = savedStats.profileViews || 0;
-
-        const updatedStats = {
-          totalClicks: totalClicks,
-          profileViews: profileViews,
-          monthlyGrowth: savedStats.monthlyGrowth || 0,
-          earnings: savedStats.earnings || 0,
-          conversionRate:
-            totalClicks > 0 && profileViews > 0
-              ? ((totalClicks / profileViews) * 100).toFixed(1)
-              : 0,
-          topLink:
-            savedLinks.length > 0
-              ? savedLinks.reduce(
-                  (top, link) =>
-                    (link.clicks || 0) > (top.clicks || 0) ? link : top,
-                  savedLinks[0]
-                ).title
-              : "None yet",
-          totalLinks: savedLinks.length,
-          activeLinks: savedLinks.filter((link) => link.isActive).length,
-        };
-
-        // Save updated stats back to localStorage
-        localStorage.setItem(
-          userStatsKey,
-          JSON.stringify({
-            profileViews: updatedStats.profileViews,
-            monthlyGrowth: updatedStats.monthlyGrowth,
-            earnings: updatedStats.earnings,
-            lastUpdated: new Date().toISOString(),
-          })
-        );
-
-        setStats(updatedStats);
-
-        console.log("✅ Dashboard data loaded from localStorage");
-        console.log("📊 Final stats:", updatedStats);
-        console.log("🛍️ Final products:", savedProducts);
-      }
-    } catch (error) {
-      console.error("❌ Error loading dashboard data:", error);
-      setError("Dashboard loaded with limited functionality");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    console.log("✅ Dashboard data loaded from backend");
+    console.log(`🔗 Links: ${fetchedLinks.length}`);
+    console.log(`🛍️ Products: ${fetchedProducts.length}`);
+  } catch (error) {
+    console.error("❌ Error loading dashboard data:", error);
+    setError(
+      error?.response?.data?.message ||
+        "Failed to load dashboard data"
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Handle adding links
   const handleAddLink = async () => {
@@ -381,49 +306,37 @@ const Dashboard = () => {
 
   // FIXED: Handle adding products with consistent key generation
   const handleAddProduct = async () => {
-    if (!newProduct.name || !newProduct.price) {
-      setError("Please fill in product name and price");
-      return;
-    }
+  if (!newProduct.name || !newProduct.price) {
+    setError("Please fill in product name and price");
+    return;
+  }
 
-    try {
-      setError("");
-      console.log("🛍️ Adding new product for user:", user?.email);
+  try {
+    setError("");
+    console.log("🛍️ Adding new product for user:", user?.email);
 
-      const productWithId = {
-        id: Date.now(),
-        ...newProduct,
-        userId: user?.id || user?.email,
-        createdAt: new Date().toISOString(),
-      };
+    const response = await productsAPI.createProduct(newProduct);
+    const createdProduct = response.data.product;
 
-      // FIXED: Use consistent key generation
-      const updatedProducts = [productWithId, ...userProducts];
-      setUserProducts(updatedProducts);
+    setUserProducts([createdProduct, ...userProducts]);
 
-      const userProductsKey = getUserKey(user, "products");
-      localStorage.setItem(userProductsKey, JSON.stringify(updatedProducts));
+    setNewProduct({
+      type: "ebook",
+      name: "",
+      price: "",
+      description: "",
+      paymentLink: "",
+    });
+    setShowAddProductModal(false);
 
-      // Clear form and close modal
-      setNewProduct({
-        type: "ebook",
-        name: "",
-        price: "",
-        description: "",
-        paymentLink: "",
-      });
-      setShowAddProductModal(false);
-
-      console.log(`✅ Product added successfully to ${userProductsKey}`);
-      console.log(`📦 Total products now: ${updatedProducts.length}`);
-
-      // Debug after adding
-      debugProductsPersistence(user);
-    } catch (error) {
-      console.error("❌ Error adding product:", error);
-      setError("Failed to add product");
-    }
-  };
+    console.log("✅ Product added successfully");
+  } catch (error) {
+    console.error("❌ Error adding product:", error);
+    setError(
+      error?.response?.data?.message || "Failed to add product"
+    );
+  }
+};
 
   // Handle editing links
   const handleEditLink = (link) => {
@@ -500,28 +413,25 @@ const Dashboard = () => {
   };
 
   // FIXED: Handle deleting products with consistent key generation
-  const handleDeleteProduct = (id) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+  const handleDeleteProduct = async (id) => {
+  if (!confirm("Are you sure you want to delete this product?")) return;
 
-    try {
-      const updatedProducts = userProducts.filter(
-        (product) => product.id !== id
-      );
-      setUserProducts(updatedProducts);
+  try {
+    await productsAPI.deleteProduct(id);
 
-      const userProductsKey = getUserKey(user, "products");
-      localStorage.setItem(userProductsKey, JSON.stringify(updatedProducts));
+    const updatedProducts = userProducts.filter(
+      (product) => product.id !== id
+    );
+    setUserProducts(updatedProducts);
 
-      console.log("✅ Product deleted successfully");
-      console.log(`📦 Remaining products: ${updatedProducts.length}`);
-
-      // Debug after deleting
-      debugProductsPersistence(user);
-    } catch (error) {
-      console.error("❌ Error deleting product:", error);
-      setError("Failed to delete product");
-    }
-  };
+    console.log("✅ Product deleted successfully");
+  } catch (error) {
+    console.error("❌ Error deleting product:", error);
+    setError(
+      error?.response?.data?.message || "Failed to delete product"
+    );
+  }
+};
 
   const toggleLinkStatus = async (id) => {
     try {
