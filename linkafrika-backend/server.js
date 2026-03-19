@@ -14,6 +14,7 @@ const DATA_DIR = "./data";
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const LINKS_FILE = path.join(DATA_DIR, "links.json");
 const ANALYTICS_FILE = path.join(DATA_DIR, "analytics.json");
+const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
 
 // CORS configuration
 const corsOptions = {
@@ -70,9 +71,10 @@ const saveData = (filePath, data) => {
 let users = loadData(USERS_FILE, []);
 let links = loadData(LINKS_FILE, []);
 let analytics = loadData(ANALYTICS_FILE, []);
+let products = loadData(PRODUCTS_FILE, []);
 
 console.log(
-  `📊 Loaded ${users.length} users, ${links.length} links, ${analytics.length} analytics events`
+  `📊 Loaded ${users.length} users, ${links.length} links, ${products.length} products, ${analytics.length} analytics events`
 );
 
 // Middleware
@@ -135,6 +137,9 @@ app.get("/test", (req, res) => {
       "POST /api/links",
       "PUT /api/links/:id",
       "DELETE /api/links/:id",
+      "GET /api/products",
+      "POST /api/products",
+      "DELETE /api/products/:id",
       "GET /api/analytics/stats",
       "POST /api/analytics/track",
       "GET /api/public/:username",
@@ -492,6 +497,95 @@ app.delete("/api/links/:id", authenticateToken, (req, res) => {
 });
 
 // ===================
+// PRODUCTS ROUTES
+// ===================
+
+// Get user's products
+app.get("/api/products", authenticateToken, (req, res) => {
+  const userProducts = products
+    .filter((product) => product.userId === req.user.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  console.log(
+    `🛍️ Retrieved ${userProducts.length} products for user:`,
+    req.user.email
+  );
+
+  res.json(userProducts);
+});
+
+// Create new product
+app.post("/api/products", authenticateToken, (req, res) => {
+  console.log("🛍️ Create product request:", req.body);
+
+  const { type, name, price, description, paymentLink } = req.body;
+
+  if (!name || !price) {
+    return res.status(400).json({
+      message: "Product name and price are required",
+    });
+  }
+
+  if (!req.user.isPro) {
+    return res.status(403).json({
+      message: "Only Pro users can add digital products",
+    });
+  }
+
+  const newProduct = {
+    id: Date.now(),
+    userId: req.user.id,
+    type: type || "ebook",
+    name: name.trim(),
+    price: Number(price),
+    description: description ? description.trim() : "",
+    paymentLink: paymentLink ? paymentLink.trim() : "",
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  products.push(newProduct);
+
+  if (saveData(PRODUCTS_FILE, products)) {
+    console.log("✅ Products data saved to file");
+  }
+
+  console.log("✅ Product created:", newProduct.name, "for user:", req.user.email);
+
+  res.status(201).json({
+    message: "Product created successfully",
+    product: newProduct,
+  });
+});
+
+// Delete product
+app.delete("/api/products/:id", authenticateToken, (req, res) => {
+  const productId = parseInt(req.params.id);
+
+  const productIndex = products.findIndex(
+    (product) => product.id === productId && product.userId === req.user.id
+  );
+
+  if (productIndex === -1) {
+    return res.status(404).json({ message: "Product not found" });
+  }
+
+  const deletedProduct = products.splice(productIndex, 1)[0];
+
+  if (saveData(PRODUCTS_FILE, products)) {
+    console.log("✅ Products data saved to file");
+  }
+
+  console.log("🗑️ Product deleted:", deletedProduct.name);
+
+  res.json({
+    message: "Product deleted successfully",
+    product: deletedProduct,
+  });
+});
+
+// ===================
 // ANALYTICS ROUTES
 // ===================
 
@@ -602,6 +696,10 @@ app.get("/api/public/:username", (req, res) => {
     .filter((link) => link.userId === user.id && link.isActive)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
+  const userProducts = products
+  .filter((product) => product.userId === user.id && product.isActive)
+  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
   // Increment profile views
   const userIndex = users.findIndex((u) => u.id === user.id);
   if (userIndex !== -1) {
@@ -628,6 +726,14 @@ app.get("/api/public/:username", (req, res) => {
       description: link.description,
       clicks: link.clicks,
     })),
+    products: userProducts.map((product) => ({
+  id: product.id,
+  type: product.type,
+  name: product.name,
+  price: product.price,
+  description: product.description,
+  paymentLink: product.paymentLink,
+})),
   };
 
   console.log("✅ Public profile served for:", user.email);
@@ -742,7 +848,9 @@ app.post("/api/debug/clear", (req, res) => {
   users.length = 0;
   links.length = 0;
   analytics.length = 0;
-
+  products.length = 0;
+  
+  saveData(PRODUCTS_FILE, products);
   saveData(USERS_FILE, users);
   saveData(LINKS_FILE, links);
   saveData(ANALYTICS_FILE, analytics);
@@ -827,6 +935,9 @@ app.use("*", (req, res) => {
       "POST /api/links",
       "PUT /api/links/:id",
       "DELETE /api/links/:id",
+      "GET /api/products",
+      "POST /api/products",
+      "DELETE /api/products/:id",
       "GET /api/analytics/stats",
       "POST /api/analytics/track",
       "GET /api/public/:username",
