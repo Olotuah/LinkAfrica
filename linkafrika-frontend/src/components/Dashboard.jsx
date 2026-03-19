@@ -71,97 +71,6 @@ const Dashboard = () => {
     paymentLink: "",
   });
 
-  // FIXED: Create a consistent user key function
-  const getUserKey = (user, prefix = "") => {
-    // ALWAYS use email as the primary identifier for consistency
-    // Never use ID to avoid key mismatches
-    const identifier = user?.email;
-
-    if (!identifier) {
-      console.error("❌ No email found for user key generation:", user);
-      return null;
-    }
-
-    const key = prefix ? `${prefix}_${identifier}` : identifier;
-
-    console.log(`🔑 Generated key: "${key}" from user email: ${user?.email}`);
-
-    return key;
-  };
-
-  // Migration function to move data from old keys to new keys
-  const migrateUserData = (user) => {
-    if (!user?.email || !user?.id) return;
-
-    const oldKeys = {
-      links: `links_${user.id}`,
-      products: `products_${user.id}`,
-      stats: `stats_${user.id}`,
-    };
-
-    const newKeys = {
-      links: `links_${user.email}`,
-      products: `products_${user.email}`,
-      stats: `stats_${user.email}`,
-    };
-
-    console.log("🔄 Checking for data migration...");
-
-    Object.keys(oldKeys).forEach((dataType) => {
-      const oldKey = oldKeys[dataType];
-      const newKey = newKeys[dataType];
-
-      const oldData = localStorage.getItem(oldKey);
-      const newData = localStorage.getItem(newKey);
-
-      // If old data exists but new data doesn't, migrate it
-      if (oldData && !newData) {
-        console.log(`📦 Migrating ${dataType} from ${oldKey} to ${newKey}`);
-        localStorage.setItem(newKey, oldData);
-        localStorage.removeItem(oldKey); // Remove old key
-      }
-    });
-  };
-  const debugProductsPersistence = (user) => {
-    console.log("🐛 === PRODUCTS DEBUG ===");
-    console.log("Current user object:", {
-      id: user?.id,
-      email: user?.email,
-      username: user?.username,
-    });
-
-    // Check all possible key variations
-    const possibleKeys = [
-      `products_${user?.id}`,
-      `products_${user?.email}`,
-      `products_${user?.id || user?.email}`,
-    ];
-
-    console.log("Checking all possible product keys:");
-    possibleKeys.forEach((key) => {
-      const data = localStorage.getItem(key);
-      if (data) {
-        console.log(
-          `✅ Found data for key "${key}":`,
-          JSON.parse(data).length,
-          "products"
-        );
-      } else {
-        console.log(`❌ No data for key "${key}"`);
-      }
-    });
-
-    // Check ALL localStorage keys for products
-    console.log("All localStorage keys:");
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("products_")) {
-        const data = JSON.parse(localStorage.getItem(key) || "[]");
-        console.log(`📦 ${key}: ${data.length} products`);
-      }
-    });
-
-    console.log("🐛 === END DEBUG ===");
-  };
 
   // Generate QR Code
   const generateQRCode = () => {
@@ -197,13 +106,15 @@ const Dashboard = () => {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login");
-      return;
-    }
+  if (!isAuthenticated) {
+    navigate("/login");
+    return;
+  }
 
+  if (user) {
     loadDashboardData();
-  }, [isAuthenticated, navigate]);
+  }
+}, [isAuthenticated, user, navigate]);
 
   // FIXED: Load dashboard data with consistent key generation
   const loadDashboardData = async () => {
@@ -465,29 +376,20 @@ const Dashboard = () => {
     }
   };
 
-  const copyProfileUrl = () => {
-    const profileUrl = `${window.location.origin}/profile/${
-      user?.username || user?.email || "yourprofile"
-    }`;
-    navigator.clipboard.writeText(profileUrl);
+  const copyProfileUrl = async () => {
+  const profileUrl = `${window.location.origin}/profile/${
+    user?.username || user?.email || "yourprofile"
+  }`;
 
-    const button = event.target.closest("button");
-    const originalText = button.innerHTML;
-    button.innerHTML =
-      '<span class="flex items-center space-x-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg><span>Copied!</span></span>';
-    button.className = button.className.replace(
-      "bg-purple-600",
-      "bg-green-600"
-    );
+  try {
+    await navigator.clipboard.writeText(profileUrl);
+    alert("Profile URL copied!");
+  } catch (error) {
+    console.error("Failed to copy profile URL:", error);
+    setError("Failed to copy profile URL");
+  }
+};
 
-    setTimeout(() => {
-      button.innerHTML = originalText;
-      button.className = button.className.replace(
-        "bg-green-600",
-        "bg-purple-600"
-      );
-    }, 2000);
-  };
 
   const linkTypeIcons = {
     social: <Instagram className="w-4 h-4" />,
