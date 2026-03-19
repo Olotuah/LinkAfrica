@@ -15,22 +15,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 /* ===================
-   MONGODB CONNECTION
-   =================== 
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log("✅ MongoDB connected successfully");
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error("❌ MongoDB connection error:", error);
-    process.exit(1);
-  });
-
-/* ===================
    SIMPLE ANALYTICS MODEL
    =================== */
 const analyticsSchema = new mongoose.Schema(
@@ -71,17 +55,28 @@ const sanitizeUser = async (userId) => {
 };
 
 const makeTempUsername = async (email) => {
-  const base = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "");
-  let candidate = base || `user${Date.now()}`;
+  const emailBase = (email || "")
+    .split("@")[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "");
+
+  const safeBase = emailBase || `user${Date.now()}`;
+  let candidate = safeBase;
   let counter = 1;
 
   while (await User.findOne({ username: candidate })) {
-    candidate = `${base}${counter}`;
+    candidate = `${safeBase}${counter}`;
     counter += 1;
   }
 
   return candidate;
 };
+
+const safeTrim = (value) =>
+  typeof value === "string" ? value.trim() : value;
+
+const safeLowerTrim = (value) =>
+  typeof value === "string" ? value.trim().toLowerCase() : value;
 
 /* ===================
    CORS
@@ -110,6 +105,7 @@ app.use(
    MIDDLEWARE
    =================== */
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -192,13 +188,13 @@ app.post("/api/auth/register", async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    if (String(password).length < 6) {
       return res.status(400).json({
         message: "Password must be at least 6 characters long",
       });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
+    const cleanEmail = safeLowerTrim(email);
 
     const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
@@ -207,7 +203,7 @@ app.post("/api/auth/register", async (req, res) => {
       });
     }
 
-    let finalUsername = username?.trim().toLowerCase();
+    let finalUsername = username ? safeLowerTrim(username) : "";
     if (!finalUsername) {
       finalUsername = await makeTempUsername(cleanEmail);
     }
@@ -220,7 +216,7 @@ app.post("/api/auth/register", async (req, res) => {
     }
 
     const finalDisplayName =
-      displayName?.trim() || name?.trim() || cleanEmail.split("@")[0];
+      safeTrim(displayName) || safeTrim(name) || cleanEmail.split("@")[0];
 
     const newUser = await User.create({
       username: finalUsername,
@@ -272,9 +268,9 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
-    const user = await User.findOne({
-      email: email.toLowerCase().trim(),
-    });
+    const cleanEmail = safeLowerTrim(email);
+
+    const user = await User.findOne({ email: cleanEmail });
 
     if (!user) {
       return res.status(400).json({
@@ -323,7 +319,7 @@ app.post("/api/auth/check-username", async (req, res) => {
       });
     }
 
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanUsername = safeLowerTrim(username);
 
     if (cleanUsername.length < 3) {
       return res.status(400).json({
@@ -384,9 +380,9 @@ app.put("/api/user/profile", auth, async (req, res) => {
 
     if (
       username &&
-      username.trim().toLowerCase() !== (req.user.username || "").toLowerCase()
+      safeLowerTrim(username) !== safeLowerTrim(req.user.username || "")
     ) {
-      const cleanUsername = username.trim().toLowerCase();
+      const cleanUsername = safeLowerTrim(username);
 
       const existingUser = await User.findOne({
         username: cleanUsername,
@@ -400,24 +396,23 @@ app.put("/api/user/profile", auth, async (req, res) => {
       }
     }
 
-    const updatePayload = {
-      updatedAt: new Date(),
-    };
+    const updatePayload = {};
 
-    if (username !== undefined) updatePayload.username = username.trim().toLowerCase();
-    if (displayName !== undefined) updatePayload.displayName = displayName.trim();
-    if (bio !== undefined) updatePayload.bio = bio.trim();
+    if (username !== undefined) updatePayload.username = safeLowerTrim(username);
+    if (displayName !== undefined) updatePayload.displayName = safeTrim(displayName);
+    if (bio !== undefined) updatePayload.bio = safeTrim(bio) || "";
     if (theme !== undefined) updatePayload.theme = theme;
-    if (avatarUrl !== undefined) updatePayload.avatarUrl = avatarUrl.trim();
+    if (avatarUrl !== undefined) updatePayload.avatarUrl = safeTrim(avatarUrl) || "";
     if (onboardingCompleted !== undefined)
       updatePayload.onboardingCompleted = onboardingCompleted;
     if (isPro !== undefined) updatePayload.isPro = isPro;
-    if (customDomain !== undefined) updatePayload.customDomain = customDomain.trim();
+    if (customDomain !== undefined)
+      updatePayload.customDomain = safeTrim(customDomain) || "";
     if (showBranding !== undefined) updatePayload.showBranding = showBranding;
     if (googleAnalyticsId !== undefined)
-      updatePayload.googleAnalyticsId = googleAnalyticsId.trim();
+      updatePayload.googleAnalyticsId = safeTrim(googleAnalyticsId) || "";
     if (facebookPixelId !== undefined)
-      updatePayload.facebookPixelId = facebookPixelId.trim();
+      updatePayload.facebookPixelId = safeTrim(facebookPixelId) || "";
 
     const updatedUser = await User.findByIdAndUpdate(req.user._id, updatePayload, {
       new: true,
@@ -484,10 +479,10 @@ app.post("/api/links", auth, async (req, res) => {
 
     const newLink = await Link.create({
       userId: req.user._id,
-      title: title.trim(),
-      url: url.trim(),
+      title: safeTrim(title),
+      url: safeTrim(url),
       type: type || "social",
-      description: description ? description.trim() : "",
+      description: description ? safeTrim(description) : "",
       isActive,
       clicks: 0,
     });
@@ -512,14 +507,12 @@ app.put("/api/links/:id", auth, async (req, res) => {
   try {
     const { title, url, type, description, isActive } = req.body;
 
-    const updatePayload = {
-      updatedAt: new Date(),
-    };
+    const updatePayload = {};
 
-    if (title !== undefined) updatePayload.title = title.trim();
-    if (url !== undefined) updatePayload.url = url.trim();
+    if (title !== undefined) updatePayload.title = safeTrim(title);
+    if (url !== undefined) updatePayload.url = safeTrim(url);
     if (type !== undefined) updatePayload.type = type;
-    if (description !== undefined) updatePayload.description = description.trim();
+    if (description !== undefined) updatePayload.description = safeTrim(description) || "";
     if (isActive !== undefined) updatePayload.isActive = isActive;
 
     const updatedLink = await Link.findOneAndUpdate(
@@ -622,11 +615,11 @@ app.post("/api/products", auth, async (req, res) => {
     const newProduct = await Product.create({
       userId: req.user._id,
       type: type || "ebook",
-      name: name.trim(),
+      name: safeTrim(name),
       price: Number(price),
-      description: description ? description.trim() : "",
-      paymentLink: paymentLink ? paymentLink.trim() : "",
-      imageUrl: imageUrl ? imageUrl.trim() : "",
+      description: description ? safeTrim(description) : "",
+      paymentLink: paymentLink ? safeTrim(paymentLink) : "",
+      imageUrl: imageUrl ? safeTrim(imageUrl) : "",
       isActive: true,
     });
 
@@ -651,16 +644,14 @@ app.put("/api/products/:id", auth, async (req, res) => {
     const { type, name, price, description, paymentLink, imageUrl, isActive } =
       req.body;
 
-    const updatePayload = {
-      updatedAt: new Date(),
-    };
+    const updatePayload = {};
 
     if (type !== undefined) updatePayload.type = type;
-    if (name !== undefined) updatePayload.name = name.trim();
+    if (name !== undefined) updatePayload.name = safeTrim(name);
     if (price !== undefined) updatePayload.price = Number(price);
-    if (description !== undefined) updatePayload.description = description.trim();
-    if (paymentLink !== undefined) updatePayload.paymentLink = paymentLink.trim();
-    if (imageUrl !== undefined) updatePayload.imageUrl = imageUrl.trim();
+    if (description !== undefined) updatePayload.description = safeTrim(description) || "";
+    if (paymentLink !== undefined) updatePayload.paymentLink = safeTrim(paymentLink) || "";
+    if (imageUrl !== undefined) updatePayload.imageUrl = safeTrim(imageUrl) || "";
     if (isActive !== undefined) updatePayload.isActive = isActive;
 
     const updatedProduct = await Product.findOneAndUpdate(
@@ -802,14 +793,14 @@ app.post("/api/analytics/track", async (req, res) => {
   try {
     const { event, data } = req.body;
 
-    const analyticsEvent = await Analytics.create({
+    await Analytics.create({
       event,
       data,
       userAgent: req.headers["user-agent"] || "",
       ip: req.ip || "",
     });
 
-    console.log("📊 Analytics event tracked:", analyticsEvent.event);
+    console.log("📊 Analytics event tracked:", event);
 
     res.json({
       message: "Event tracked successfully",
@@ -830,18 +821,14 @@ app.post("/api/analytics/track", async (req, res) => {
 // GET PUBLIC PROFILE
 app.get("/api/public/:username", async (req, res) => {
   try {
-    const { username } = req.params;
+    const requestedUsername = safeLowerTrim(req.params.username);
 
-    console.log("🌍 Public profile request for:", username);
+    console.log("🌍 Public profile request for:", requestedUsername);
 
-    let user = await User.findOne({
-      username: username.toLowerCase(),
-    });
+    let user = await User.findOne({ username: requestedUsername });
 
     if (!user) {
-      user = await User.findOne({
-        email: username.toLowerCase(),
-      });
+      user = await User.findOne({ email: requestedUsername });
     }
 
     if (!user) {
@@ -1026,9 +1013,12 @@ app.post("/api/debug/set-username", async (req, res) => {
       });
     }
 
+    const cleanEmail = safeLowerTrim(email);
+    const cleanUsername = safeLowerTrim(username);
+
     const existingUsername = await User.findOne({
-      username: username.toLowerCase().trim(),
-      email: { $ne: email.toLowerCase().trim() },
+      username: cleanUsername,
+      email: { $ne: cleanEmail },
     });
 
     if (existingUsername) {
@@ -1038,11 +1028,9 @@ app.post("/api/debug/set-username", async (req, res) => {
     }
 
     const updatedUser = await User.findOneAndUpdate(
-      { email: email.toLowerCase().trim() },
-      {
-        username: username.toLowerCase().trim(),
-      },
-      { new: true }
+      { email: cleanEmail },
+      { username: cleanUsername },
+      { new: true, runValidators: true }
     ).select("-password");
 
     if (!updatedUser) {
@@ -1104,9 +1092,10 @@ if (KEEP_ALIVE_URL) {
 /* ===================
    SERVER START
    =================== */
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
+const startServer = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+
     console.log("✅ MongoDB connected successfully");
 
     app.listen(PORT, () => {
@@ -1119,8 +1108,10 @@ mongoose
       console.log("✅ Server ready! MongoDB backend is now active.");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     });
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error("❌ MongoDB connection error:", error);
     process.exit(1);
-  });
+  }
+};
+
+startServer();
