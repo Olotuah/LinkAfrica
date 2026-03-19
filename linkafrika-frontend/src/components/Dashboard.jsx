@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { uploadImageToCloudinary } from "../utils/cloudinaryUpload";
+import { userAPI } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { linksAPI, analyticsAPI, productsAPI } from "../utils/api";
 import {
@@ -48,6 +50,9 @@ const Dashboard = () => {
     activeLinks: 0,
   });
 
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [productImageFile, setProductImageFile] = useState(null);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -69,7 +74,7 @@ const Dashboard = () => {
     price: "",
     description: "",
     paymentLink: "",
-    imageUrl: "",
+  
   });
 
   const generateQRCode = () => {
@@ -215,14 +220,24 @@ const Dashboard = () => {
 
   try {
     setError("");
-    console.log("🛍️ Adding new product for user:", user?.email);
 
-    const response = await productsAPI.createProduct(newProduct);
+    let imageUrl = "";
 
-    const createdProduct = {
-      ...response.data.product,
-      id: response.data.product.id || response.data.product._id,
+    if (productImageFile) {
+      const uploaded = await uploadImageToCloudinary(
+        productImageFile,
+        "linkafrika/product-images"
+      );
+      imageUrl = uploaded.secure_url;
+    }
+
+    const payload = {
+      ...newProduct,
+      imageUrl,
     };
+
+    const response = await productsAPI.createProduct(payload);
+    const createdProduct = response.data.product;
 
     setUserProducts((prev) => [createdProduct, ...prev]);
 
@@ -234,9 +249,8 @@ const Dashboard = () => {
       paymentLink: "",
       imageUrl: "",
     });
+    setProductImageFile(null);
     setShowAddProductModal(false);
-
-    console.log("✅ Product added successfully");
   } catch (error) {
     console.error("❌ Error adding product:", error);
     setError(error?.response?.data?.message || "Failed to add product");
@@ -306,6 +320,32 @@ const Dashboard = () => {
       setError(error?.response?.data?.message || "Failed to delete link");
     }
   };
+
+  const handleAvatarUploadAndSave = async () => {
+  try {
+    setUploadingAvatar(true);
+
+    let avatarUrl = user?.avatarUrl || "";
+
+    if (avatarFile) {
+      const uploaded = await uploadImageToCloudinary(
+        avatarFile,
+        "linkafrika/profile-pictures"
+      );
+      avatarUrl = uploaded.secure_url;
+    }
+
+    const response = await userAPI.updateProfile({
+      avatarUrl,
+    });
+
+    console.log("✅ Profile image updated:", response.data);
+  } catch (error) {
+    console.error("❌ Avatar upload failed:", error);
+  } finally {
+    setUploadingAvatar(false);
+  }
+};
 
   const handleDeleteProduct = async (id) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -1021,15 +1061,12 @@ const Dashboard = () => {
 
               <div>
   <label className="block text-sm font-medium text-gray-700 mb-2">
-    Product Image URL
+    Product Image
   </label>
   <input
-    type="url"
-    value={newProduct.imageUrl}
-    onChange={(e) =>
-      setNewProduct({ ...newProduct, imageUrl: e.target.value })
-    }
-    placeholder="https://example.com/product-image.jpg"
+    type="file"
+    accept="image/*"
+    onChange={(e) => setProductImageFile(e.target.files?.[0] || null)}
     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
   />
 </div>
