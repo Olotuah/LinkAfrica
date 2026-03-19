@@ -535,47 +535,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
-  <h2 className="text-lg font-semibold text-gray-900 mb-4">
-    Profile Picture
-  </h2>
-
-  <div className="flex flex-col sm:flex-row items-center gap-4">
-    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-100 bg-gray-100 flex items-center justify-center">
-      {user?.avatarUrl ? (
-        <img
-          src={user.avatarUrl}
-          alt={user?.displayName || user?.username || "Profile"}
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <span className="text-2xl font-bold text-gray-500">
-          {(user?.displayName || user?.username || user?.email || "U")
-            .charAt(0)
-            .toUpperCase()}
-        </span>
-      )}
-    </div>
-
-    <div className="flex-1 w-full">
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-        className="w-full p-3 border border-gray-300 rounded-lg"
-      />
-
-      <button
-        onClick={handleAvatarUploadAndSave}
-        disabled={uploadingAvatar || !avatarFile}
-        className="mt-3 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
-      >
-        {uploadingAvatar ? "Uploading..." : "Upload Profile Picture"}
-      </button>
-    </div>
-  </div>
-</div>
-
         <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-4 mb-8 text-white">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="min-w-0">
