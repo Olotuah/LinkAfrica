@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AnalyticsTracker from "../utils/analytics";
-import KemiCreatesProfile from "./KemiCreatesProfile";
+import KemiCreatesProfile from "./NelsonCreatesProfile";
 import NelsonCreatesProfile from "./NelsonCreatesProfile";
 import {
   ExternalLink,
