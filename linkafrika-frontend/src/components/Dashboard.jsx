@@ -114,150 +114,168 @@ const Dashboard = () => {
   }, [isAuthenticated, user, navigate]);
 
   const loadDashboardData = async () => {
-    try {
-      setIsLoading(true);
-      setError("");
+  try {
+    setIsLoading(true);
+    setError("");
 
-      console.log("📊 Loading dashboard data for user:", user?.email);
+    console.log("📊 Loading dashboard data for user:", user?.email);
 
-      const [linksResponse, statsResponse, productsResponse] = await Promise.all(
-        [
-          linksAPI.getLinks(),
-          analyticsAPI.getStats(30),
-          productsAPI.getProducts(),
-        ]
-      );
+    const [linksResponse, statsResponse, productsResponse] = await Promise.all([
+      linksAPI.getLinks(),
+      analyticsAPI.getStats(30),
+      productsAPI.getProducts(),
+    ]);
 
-      const fetchedLinks = Array.isArray(linksResponse.data)
-        ? linksResponse.data
-        : [];
-      const fetchedProducts = Array.isArray(productsResponse.data)
-        ? productsResponse.data
-        : [];
+    const fetchedLinks = Array.isArray(linksResponse.data)
+      ? linksResponse.data.map((link) => ({
+          ...link,
+          id: link.id || link._id,
+        }))
+      : [];
 
-      setUserLinks(fetchedLinks);
-      setUserProducts(fetchedProducts);
+    const fetchedProducts = Array.isArray(productsResponse.data)
+      ? productsResponse.data.map((product) => ({
+          ...product,
+          id: product.id || product._id,
+        }))
+      : [];
 
-      setStats({
-        ...statsResponse.data,
-        totalLinks: fetchedLinks.length,
-        activeLinks: fetchedLinks.filter((link) => link.isActive).length,
-      });
+    setUserLinks(fetchedLinks);
+    setUserProducts(fetchedProducts);
 
-      console.log("✅ Dashboard data loaded from backend");
-      console.log(`🔗 Links: ${fetchedLinks.length}`);
-      console.log(`🛍️ Products: ${fetchedProducts.length}`);
-    } catch (error) {
-      console.error("❌ Error loading dashboard data:", error);
-      setError(
-        error?.response?.data?.message || "Failed to load dashboard data"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setStats({
+      ...statsResponse.data,
+      totalLinks: fetchedLinks.length,
+      activeLinks: fetchedLinks.filter((link) => link.isActive).length,
+    });
+
+    console.log("✅ Dashboard data loaded from backend");
+    console.log(`🔗 Links: ${fetchedLinks.length}`);
+    console.log(`🛍️ Products: ${fetchedProducts.length}`);
+  } catch (error) {
+    console.error("❌ Error loading dashboard data:", error);
+    setError(
+      error?.response?.data?.message || "Failed to load dashboard data"
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleAddLink = async () => {
-    if (!newLink.title || !newLink.url) {
-      setError("Please fill in title and URL");
-      return;
-    }
+  if (!newLink.title || !newLink.url) {
+    setError("Please fill in title and URL");
+    return;
+  }
 
-    if (!user?.isPro && userLinks.length >= 3) {
-      setShowUpgradePrompt(true);
-      return;
-    }
+  if (!user?.isPro && userLinks.length >= 3) {
+    setShowUpgradePrompt(true);
+    return;
+  }
 
-    try {
-      setError("");
-      console.log("🔗 Adding new link for user:", user?.email);
+  try {
+    setError("");
+    console.log("🔗 Adding new link for user:", user?.email);
 
-      const response = await linksAPI.createLink(newLink);
-      const createdLink = response.data.link;
+    const response = await linksAPI.createLink(newLink);
 
-      setUserLinks((prev) => [createdLink, ...prev]);
+    const createdLink = {
+      ...response.data.link,
+      id: response.data.link.id || response.data.link._id,
+    };
 
-      setNewLink({
-        title: "",
-        url: "",
-        type: "social",
-        description: "",
-      });
-      setShowAddLinkModal(false);
+    setUserLinks((prev) => [createdLink, ...prev]);
 
-      setStats((prev) => ({
-        ...prev,
-        totalLinks: prev.totalLinks + 1,
-        activeLinks: prev.activeLinks + 1,
-      }));
+    setNewLink({
+      title: "",
+      url: "",
+      type: "social",
+      description: "",
+    });
+    setShowAddLinkModal(false);
 
-      console.log("✅ Link added successfully");
-    } catch (error) {
-      console.error("❌ Error adding link:", error);
-      setError(error?.response?.data?.message || "Failed to add link");
-    }
-  };
+    setStats((prev) => ({
+      ...prev,
+      totalLinks: prev.totalLinks + 1,
+      activeLinks: prev.activeLinks + 1,
+    }));
+
+    console.log("✅ Link added successfully");
+  } catch (error) {
+    console.error("❌ Error adding link:", error);
+    setError(error?.response?.data?.message || "Failed to add link");
+  }
+};
 
   const handleAddProduct = async () => {
-    if (!newProduct.name || !newProduct.price) {
-      setError("Please fill in product name and price");
-      return;
-    }
+  if (!newProduct.name || !newProduct.price) {
+    setError("Please fill in product name and price");
+    return;
+  }
 
-    try {
-      setError("");
-      console.log("🛍️ Adding new product for user:", user?.email);
+  try {
+    setError("");
+    console.log("🛍️ Adding new product for user:", user?.email);
 
-      const response = await productsAPI.createProduct(newProduct);
-      const createdProduct = response.data.product;
+    const response = await productsAPI.createProduct(newProduct);
 
-      setUserProducts((prev) => [createdProduct, ...prev]);
+    const createdProduct = {
+      ...response.data.product,
+      id: response.data.product.id || response.data.product._id,
+    };
 
-      setNewProduct({
-        type: "ebook",
-        name: "",
-        price: "",
-        description: "",
-        paymentLink: "",
-        imageUrl: "",
-      });
-      setShowAddProductModal(false);
+    setUserProducts((prev) => [createdProduct, ...prev]);
 
-      console.log("✅ Product added successfully");
-    } catch (error) {
-      console.error("❌ Error adding product:", error);
-      setError(error?.response?.data?.message || "Failed to add product");
-    }
-  };
+    setNewProduct({
+      type: "ebook",
+      name: "",
+      price: "",
+      description: "",
+      paymentLink: "",
+      imageUrl: "",
+    });
+    setShowAddProductModal(false);
+
+    console.log("✅ Product added successfully");
+  } catch (error) {
+    console.error("❌ Error adding product:", error);
+    setError(error?.response?.data?.message || "Failed to add product");
+  }
+};
 
   const handleEditLink = (link) => {
     setEditingLink({ ...link });
   };
 
   const handleSaveEdit = async () => {
-    if (!editingLink.title || !editingLink.url) {
-      setError("Please fill in title and URL");
-      return;
-    }
+  if (!editingLink.title || !editingLink.url) {
+    setError("Please fill in title and URL");
+    return;
+  }
 
-    try {
-      setError("");
+  try {
+    setError("");
 
-      await linksAPI.updateLink(editingLink.id, editingLink);
+    const response = await linksAPI.updateLink(editingLink.id, editingLink);
 
-      const updatedLinks = userLinks.map((link) =>
-        link.id === editingLink.id ? { ...link, ...editingLink } : link
-      );
+    const updatedLink = {
+      ...response.data.link,
+      id: response.data.link.id || response.data.link._id,
+    };
 
-      setUserLinks(updatedLinks);
-      setEditingLink(null);
+    const updatedLinks = userLinks.map((link) =>
+      link.id === editingLink.id ? updatedLink : link
+    );
 
-      console.log("✅ Link updated successfully");
-    } catch (error) {
-      console.error("❌ Error updating link:", error);
-      setError(error?.response?.data?.message || "Failed to update link");
-    }
-  };
+    setUserLinks(updatedLinks);
+    setEditingLink(null);
+
+    console.log("✅ Link updated successfully");
+  } catch (error) {
+    console.error("❌ Error updating link:", error);
+    setError(error?.response?.data?.message || "Failed to update link");
+  }
+};
 
   const handleCancelEdit = () => {
     setEditingLink(null);
@@ -468,7 +486,7 @@ const Dashboard = () => {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold mb-2 break-words">
-                Welcome back, {user?.name || user?.email || "User"}! 👋
+                Welcome back, {user?.displayName || user?.username || user?.email || "User"}! 👋
               </h1>
               <p className="opacity-90 text-sm">
                 Manage your links and grow your online presence
@@ -839,7 +857,7 @@ const Dashboard = () => {
                           {product.name}
                         </h3>
                         <p className="text-sm text-gray-500">
-                          ₦{parseInt(product.price).toLocaleString()} •{" "}
+                          ₦{Number(product.price || 0).toLocaleString()} •{" "}
                           {product.type}
                         </p>
                         {product.description && (
