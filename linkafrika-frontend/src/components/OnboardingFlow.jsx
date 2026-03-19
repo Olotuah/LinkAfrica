@@ -244,32 +244,36 @@ const OnboardingFlow = () => {
 
     console.log("✅ Backend profile updated:", apiUser);
 
-    // 2. Update auth context + localStorage user
+    // 2. Create onboarding links FIRST before updating auth context
+    const enabledLinks = initialLinks.filter(
+      (link) => link.enabled && link.url.trim()
+    );
+
+    const linksToCreate = apiUser.isPro
+      ? enabledLinks
+      : enabledLinks.slice(0, 3);
+
+    for (const link of linksToCreate) {
+      const normalizedType =
+        link.type === "instagram" ? "social" : link.type;
+
+      const linkPayload = {
+        title: link.title,
+        url: link.url.trim(),
+        type: normalizedType,
+        description: `My ${link.title} profile`,
+      };
+
+      const response = await linksAPI.createLink(linkPayload);
+      console.log("✅ Created onboarding link:", response.data?.link || linkPayload);
+    }
+
+    // 3. NOW update auth context + localStorage
     if (updateUser && typeof updateUser === "function") {
       updateUser(apiUser);
     }
 
     localStorage.setItem("user", JSON.stringify(apiUser));
-
-    // 3. Create onboarding links in backend only
-    const enabledLinks = initialLinks.filter(
-      (link) => link.enabled && link.url.trim()
-    );
-
-    // Free users can only have 3 links
-    const linksToCreate = apiUser.isPro ? enabledLinks : enabledLinks.slice(0, 3);
-
-    for (const link of linksToCreate) {
-      const linkPayload = {
-        title: link.title,
-        url: link.url.trim(),
-        type: link.type,
-        description: `My ${link.title} profile`,
-      };
-
-      await linksAPI.createLink(linkPayload);
-      console.log(`✅ Created onboarding link in backend: ${link.title}`);
-    }
 
     console.log("🎉 Onboarding completed successfully!");
     navigate("/dashboard?welcome=true");
