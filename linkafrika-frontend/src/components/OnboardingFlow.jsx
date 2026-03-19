@@ -41,7 +41,7 @@ const OnboardingFlow = () => {
   });
 
   const [initialLinks, setInitialLinks] = useState([
-    { type: "instagram", title: "Instagram", url: "", enabled: false },
+    { type: "social", title: "Instagram", url: "", enabled: false },
     { type: "youtube", title: "YouTube", url: "", enabled: false },
     { type: "whatsapp", title: "WhatsApp", url: "", enabled: false },
     { type: "website", title: "Website", url: "", enabled: false },
