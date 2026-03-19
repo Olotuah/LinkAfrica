@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5000;
 
 /* ===================
    MONGODB CONNECTION
-   =================== */
+   =================== 
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
@@ -1104,13 +1104,23 @@ if (KEEP_ALIVE_URL) {
 /* ===================
    SERVER START
    =================== */
-app.listen(PORT, () => {
-  console.log(`🚀 LinkAfrika API running on http://localhost:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`📖 Health check: http://localhost:${PORT}/health`);
-  console.log(`🧪 Test endpoint: http://localhost:${PORT}/test`);
-  console.log(`🔗 API Base: http://localhost:${PORT}/api`);
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("✅ Server ready! MongoDB backend is now active.");
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-});
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log("✅ MongoDB connected successfully");
+
+    app.listen(PORT, () => {
+      console.log(`🚀 LinkAfrika API running on port ${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`📖 Health check: /health`);
+      console.log(`🧪 Test endpoint: /test`);
+      console.log(`🔗 API Base: /api`);
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("✅ Server ready! MongoDB backend is now active.");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    });
+  })
+  .catch((error) => {
+    console.error("❌ MongoDB connection error:", error);
+    process.exit(1);
+  });
