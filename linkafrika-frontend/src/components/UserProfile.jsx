@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import AnalyticsTracker from "../utils/analytics";
 import { uploadImageToCloudinary } from "../utils/cloudinaryUpload";
 import { userAPI } from "../utils/api";
-import KemiCreatesProfile from "./KemiCreatesProfile";
+import KemiCreatesProfile from "./NelsonCreatesProfile";
 import NelsonCreatesProfile from "./NelsonCreatesProfile";
 import {
   ExternalLink,
