@@ -71,8 +71,6 @@ const Dashboard = () => {
     paymentLink: "",
   });
 
-
-  // Generate QR Code
   const generateQRCode = () => {
     const profileUrl = `${window.location.origin}/profile/${
       user?.username || user?.email
@@ -87,7 +85,6 @@ const Dashboard = () => {
     link.click();
   };
 
-  // Check for welcome or upgrade flags
   useEffect(() => {
     if (searchParams.get("welcome") === "true") {
       setShowWelcome(true);
@@ -104,61 +101,61 @@ const Dashboard = () => {
     }
   }, [searchParams, navigate]);
 
-  // Redirect if not authenticated
   useEffect(() => {
-  if (!isAuthenticated) {
-    navigate("/login");
-    return;
-  }
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
 
-  if (user) {
-    loadDashboardData();
-  }
-}, [isAuthenticated, user, navigate]);
+    if (user) {
+      loadDashboardData();
+    }
+  }, [isAuthenticated, user, navigate]);
 
-  // FIXED: Load dashboard data with consistent key generation
   const loadDashboardData = async () => {
-  try {
-    setIsLoading(true);
-    setError("");
+    try {
+      setIsLoading(true);
+      setError("");
 
-    console.log("📊 Loading dashboard data for user:", user?.email);
+      console.log("📊 Loading dashboard data for user:", user?.email);
 
-    const [linksResponse, statsResponse, productsResponse] = await Promise.all([
-      linksAPI.getLinks(),
-      analyticsAPI.getStats(30),
-      productsAPI.getProducts(),
-    ]);
+      const [linksResponse, statsResponse, productsResponse] = await Promise.all(
+        [
+          linksAPI.getLinks(),
+          analyticsAPI.getStats(30),
+          productsAPI.getProducts(),
+        ]
+      );
 
-    const fetchedLinks = Array.isArray(linksResponse.data) ? linksResponse.data : [];
-    const fetchedProducts = Array.isArray(productsResponse.data)
-      ? productsResponse.data
-      : [];
+      const fetchedLinks = Array.isArray(linksResponse.data)
+        ? linksResponse.data
+        : [];
+      const fetchedProducts = Array.isArray(productsResponse.data)
+        ? productsResponse.data
+        : [];
 
-    setUserLinks(fetchedLinks);
-    setUserProducts(fetchedProducts);
+      setUserLinks(fetchedLinks);
+      setUserProducts(fetchedProducts);
 
-    setStats({
-      ...statsResponse.data,
-      totalLinks: fetchedLinks.length,
-      activeLinks: fetchedLinks.filter((link) => link.isActive).length,
-    });
+      setStats({
+        ...statsResponse.data,
+        totalLinks: fetchedLinks.length,
+        activeLinks: fetchedLinks.filter((link) => link.isActive).length,
+      });
 
-    console.log("✅ Dashboard data loaded from backend");
-    console.log(`🔗 Links: ${fetchedLinks.length}`);
-    console.log(`🛍️ Products: ${fetchedProducts.length}`);
-  } catch (error) {
-    console.error("❌ Error loading dashboard data:", error);
-    setError(
-      error?.response?.data?.message ||
-        "Failed to load dashboard data"
-    );
-  } finally {
-    setIsLoading(false);
-  }
-};
+      console.log("✅ Dashboard data loaded from backend");
+      console.log(`🔗 Links: ${fetchedLinks.length}`);
+      console.log(`🛍️ Products: ${fetchedProducts.length}`);
+    } catch (error) {
+      console.error("❌ Error loading dashboard data:", error);
+      setError(
+        error?.response?.data?.message || "Failed to load dashboard data"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  // Handle adding links
   const handleAddLink = async () => {
     if (!newLink.title || !newLink.url) {
       setError("Please fill in title and URL");
@@ -174,34 +171,19 @@ const Dashboard = () => {
       setError("");
       console.log("🔗 Adding new link for user:", user?.email);
 
-      try {
-        const response = await linksAPI.createLink(newLink);
-        setUserLinks([response.data.link, ...userLinks]);
-        console.log("✅ Link created via API");
-      } catch (apiError) {
-        const newLinkWithId = {
-          id: Date.now(),
-          ...newLink,
-          clicks: 0,
-          isActive: true,
-          userId: user?.id || user?.email,
-          createdAt: new Date().toISOString(),
-        };
+      const response = await linksAPI.createLink(newLink);
+      const createdLink = response.data.link;
 
-        const updatedLinks = [newLinkWithId, ...userLinks];
-        setUserLinks(updatedLinks);
+      setUserLinks((prev) => [createdLink, ...prev]);
 
-        // Save to user-specific localStorage key
-        const userLinksKey = getUserKey(user, "links");
-        localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
-
-        console.log(`✅ Link saved locally for user: ${userLinksKey}`);
-      }
-
-      setNewLink({ title: "", url: "", type: "social", description: "" });
+      setNewLink({
+        title: "",
+        url: "",
+        type: "social",
+        description: "",
+      });
       setShowAddLinkModal(false);
 
-      // Update stats immediately
       setStats((prev) => ({
         ...prev,
         totalLinks: prev.totalLinks + 1,
@@ -211,45 +193,41 @@ const Dashboard = () => {
       console.log("✅ Link added successfully");
     } catch (error) {
       console.error("❌ Error adding link:", error);
-      setError("Failed to add link");
+      setError(error?.response?.data?.message || "Failed to add link");
     }
   };
 
-  // FIXED: Handle adding products with consistent key generation
   const handleAddProduct = async () => {
-  if (!newProduct.name || !newProduct.price) {
-    setError("Please fill in product name and price");
-    return;
-  }
+    if (!newProduct.name || !newProduct.price) {
+      setError("Please fill in product name and price");
+      return;
+    }
 
-  try {
-    setError("");
-    console.log("🛍️ Adding new product for user:", user?.email);
+    try {
+      setError("");
+      console.log("🛍️ Adding new product for user:", user?.email);
 
-    const response = await productsAPI.createProduct(newProduct);
-    const createdProduct = response.data.product;
+      const response = await productsAPI.createProduct(newProduct);
+      const createdProduct = response.data.product;
 
-    setUserProducts([createdProduct, ...userProducts]);
+      setUserProducts((prev) => [createdProduct, ...prev]);
 
-    setNewProduct({
-      type: "ebook",
-      name: "",
-      price: "",
-      description: "",
-      paymentLink: "",
-    });
-    setShowAddProductModal(false);
+      setNewProduct({
+        type: "ebook",
+        name: "",
+        price: "",
+        description: "",
+        paymentLink: "",
+      });
+      setShowAddProductModal(false);
 
-    console.log("✅ Product added successfully");
-  } catch (error) {
-    console.error("❌ Error adding product:", error);
-    setError(
-      error?.response?.data?.message || "Failed to add product"
-    );
-  }
-};
+      console.log("✅ Product added successfully");
+    } catch (error) {
+      console.error("❌ Error adding product:", error);
+      setError(error?.response?.data?.message || "Failed to add product");
+    }
+  };
 
-  // Handle editing links
   const handleEditLink = (link) => {
     setEditingLink({ ...link });
   };
@@ -263,27 +241,19 @@ const Dashboard = () => {
     try {
       setError("");
 
-      try {
-        await linksAPI.updateLink(editingLink.id, editingLink);
-      } catch (apiError) {
-        console.log("API not available, updating locally");
-      }
+      await linksAPI.updateLink(editingLink.id, editingLink);
 
-      // Update links in state
       const updatedLinks = userLinks.map((link) =>
-        link.id === editingLink.id ? editingLink : link
+        link.id === editingLink.id ? { ...link, ...editingLink } : link
       );
+
       setUserLinks(updatedLinks);
-
-      // Save to localStorage
-      const userLinksKey = getUserKey(user, "links");
-      localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
-
       setEditingLink(null);
+
       console.log("✅ Link updated successfully");
     } catch (error) {
       console.error("❌ Error updating link:", error);
-      setError("Failed to update link");
+      setError(error?.response?.data?.message || "Failed to update link");
     }
   };
 
@@ -295,74 +265,60 @@ const Dashboard = () => {
     if (!confirm("Are you sure you want to delete this link?")) return;
 
     try {
-      try {
-        await linksAPI.deleteLink(id);
-      } catch (apiError) {
-        console.log("API not available, deleting locally");
-      }
+      await linksAPI.deleteLink(id);
 
+      const deletedLink = userLinks.find((link) => link.id === id);
       const updatedLinks = userLinks.filter((link) => link.id !== id);
-      setUserLinks(updatedLinks);
 
-      // Save to localStorage after deletion
-      const userLinksKey = getUserKey(user, "links");
-      localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
+      setUserLinks(updatedLinks);
 
       setStats((prev) => ({
         ...prev,
-        totalLinks: prev.totalLinks - 1,
-        activeLinks:
-          prev.activeLinks -
-          (userLinks.find((l) => l.id === id)?.isActive ? 1 : 0),
+        totalLinks: Math.max(0, prev.totalLinks - 1),
+        activeLinks: deletedLink?.isActive
+          ? Math.max(0, prev.activeLinks - 1)
+          : prev.activeLinks,
       }));
 
-      console.log("✅ Link deleted and saved to localStorage");
+      console.log("✅ Link deleted successfully");
     } catch (error) {
-      console.error("Error deleting link:", error);
-      setError("Failed to delete link");
+      console.error("❌ Error deleting link:", error);
+      setError(error?.response?.data?.message || "Failed to delete link");
     }
   };
 
-  // FIXED: Handle deleting products with consistent key generation
   const handleDeleteProduct = async (id) => {
-  if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm("Are you sure you want to delete this product?")) return;
 
-  try {
-    await productsAPI.deleteProduct(id);
+    try {
+      await productsAPI.deleteProduct(id);
 
-    const updatedProducts = userProducts.filter(
-      (product) => product.id !== id
-    );
-    setUserProducts(updatedProducts);
+      const updatedProducts = userProducts.filter(
+        (product) => product.id !== id
+      );
+      setUserProducts(updatedProducts);
 
-    console.log("✅ Product deleted successfully");
-  } catch (error) {
-    console.error("❌ Error deleting product:", error);
-    setError(
-      error?.response?.data?.message || "Failed to delete product"
-    );
-  }
-};
+      console.log("✅ Product deleted successfully");
+    } catch (error) {
+      console.error("❌ Error deleting product:", error);
+      setError(error?.response?.data?.message || "Failed to delete product");
+    }
+  };
 
   const toggleLinkStatus = async (id) => {
     try {
       const link = userLinks.find((l) => l.id === id);
+      if (!link) return;
+
       const updatedStatus = !link.isActive;
 
-      try {
-        await linksAPI.updateLink(id, { isActive: updatedStatus });
-      } catch (apiError) {
-        console.log("API not available, updating locally");
-      }
+      await linksAPI.updateLink(id, { isActive: updatedStatus });
 
-      const updatedLinks = userLinks.map((link) =>
-        link.id === id ? { ...link, isActive: updatedStatus } : link
+      const updatedLinks = userLinks.map((item) =>
+        item.id === id ? { ...item, isActive: updatedStatus } : item
       );
-      setUserLinks(updatedLinks);
 
-      // Save to localStorage
-      const userLinksKey = getUserKey(user, "links");
-      localStorage.setItem(userLinksKey, JSON.stringify(updatedLinks));
+      setUserLinks(updatedLinks);
 
       setStats((prev) => ({
         ...prev,
@@ -371,25 +327,24 @@ const Dashboard = () => {
           : prev.activeLinks - 1,
       }));
     } catch (error) {
-      console.error("Error updating link:", error);
-      setError("Failed to update link");
+      console.error("❌ Error updating link:", error);
+      setError(error?.response?.data?.message || "Failed to update link");
     }
   };
 
   const copyProfileUrl = async () => {
-  const profileUrl = `${window.location.origin}/profile/${
-    user?.username || user?.email || "yourprofile"
-  }`;
+    const profileUrl = `${window.location.origin}/profile/${
+      user?.username || user?.email || "yourprofile"
+    }`;
 
-  try {
-    await navigator.clipboard.writeText(profileUrl);
-    alert("Profile URL copied!");
-  } catch (error) {
-    console.error("Failed to copy profile URL:", error);
-    setError("Failed to copy profile URL");
-  }
-};
-
+    try {
+      await navigator.clipboard.writeText(profileUrl);
+      alert("Profile URL copied!");
+    } catch (error) {
+      console.error("Failed to copy profile URL:", error);
+      setError("Failed to copy profile URL");
+    }
+  };
 
   const linkTypeIcons = {
     social: <Instagram className="w-4 h-4" />,
@@ -420,7 +375,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Welcome Modal */}
       {showWelcome && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center">
@@ -458,7 +412,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Upgrade Prompt Modal */}
       {showUpgradePrompt && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full">
@@ -496,7 +449,6 @@ const Dashboard = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Error Alert */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center">
             <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
@@ -510,7 +462,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* User Welcome Section */}
         <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-4 mb-8 text-white">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="min-w-0">
@@ -532,7 +483,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Top Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="flex items-center justify-between">
@@ -583,15 +533,12 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Profile URL Section */}
         <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Your LinkAfrika URL
           </h2>
 
-          {/* Stack on mobile, row on >= sm */}
           <div className="bg-gray-50 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3">
-            {/* Icon + URL (let it wrap/truncate properly) */}
             <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
               <Globe className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <span className="flex-1 text-gray-700 font-medium break-all sm:break-normal min-w-0">
@@ -600,7 +547,6 @@ const Dashboard = () => {
               </span>
             </div>
 
-            {/* Buttons — full width on mobile, inline on >= sm */}
             <div className="flex w-full sm:w-auto gap-2">
               <button
                 onClick={copyProfileUrl}
@@ -628,7 +574,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Links Management */}
         <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -674,7 +619,6 @@ const Dashboard = () => {
                   className="flex flex-col sm:flex-row sm:items-center p-3 bg-gray-50 rounded-lg border gap-3"
                 >
                   {editingLink && editingLink.id === link.id ? (
-                    // EDIT MODE
                     <div className="flex-1 space-y-3">
                       <input
                         type="text"
@@ -717,7 +661,6 @@ const Dashboard = () => {
                       </div>
                     </div>
                   ) : (
-                    // VIEW MODE - FIXED
                     <>
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -790,7 +733,6 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <button
             onClick={() =>
@@ -841,7 +783,6 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Product Selling Section for Pro Users */}
         {user?.isPro && (
           <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
             <div className="flex justify-between items-center mb-6">
@@ -941,7 +882,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Pro Features Preview for Free Users */}
         {!user?.isPro && (
           <div className="bg-gradient-to-r from-orange-500 to-green-500 rounded-xl p-6 text-white mb-8">
             <div className="flex items-center justify-between">
@@ -984,7 +924,6 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Add Product Modal */}
       {showAddProductModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
@@ -1097,7 +1036,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Add Link Modal */}
       {showAddLinkModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
