@@ -45,6 +45,12 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Onboarding
+    onboardingCompleted: {
+      type: Boolean,
+      default: false,
+    },
+
     // Account Status
     isVerified: {
       type: Boolean,
@@ -90,7 +96,7 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
-    // Timestamps
+    // Activity
     lastLoginAt: {
       type: Date,
       default: Date.now,
@@ -105,9 +111,7 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for performance
-userSchema.index({ username: 1 });
-userSchema.index({ email: 1 });
+// Keep only this extra index
 userSchema.index({ createdAt: -1 });
 
 // Hash password before saving
@@ -125,7 +129,7 @@ userSchema.pre("save", async function (next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  return bcrypt.compare(candidatePassword, this.password);
 };
 
 // Get public profile data
@@ -145,17 +149,18 @@ userSchema.methods.getPublicProfile = function () {
 // Check if user can add more links
 userSchema.methods.canAddLinks = function (currentLinkCount) {
   if (this.isPro) return true;
-  return currentLinkCount < 3; // Free users get 3 links
+  return currentLinkCount < 3;
 };
 
 // Virtual for profile URL
 userSchema.virtual("profileUrl").get(function () {
-  return `https://linkafrika.com/${this.username}`;
+  return `https://linkafrika.tech/profile/${this.username}`;
 });
 
 // Ensure virtual fields are serialized
 userSchema.set("toJSON", { virtuals: true });
+userSchema.set("toObject", { virtuals: true });
 
-const User = mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default User;
