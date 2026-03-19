@@ -150,8 +150,14 @@ linkSchema.statics.getActiveLinks = function (userId) {
   return this.find({
     userId,
     isActive: true,
-    $or: [{ scheduledStart: null }, { scheduledStart: { $lte: now } }],
-    $or: [{ scheduledEnd: null }, { scheduledEnd: { $gte: now } }],
+    $and: [
+      {
+        $or: [{ scheduledStart: null }, { scheduledStart: { $lte: now } }],
+      },
+      {
+        $or: [{ scheduledEnd: null }, { scheduledEnd: { $gte: now } }],
+      },
+    ],
   }).sort({ order: 1 });
 };
 
