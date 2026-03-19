@@ -69,6 +69,7 @@ const Dashboard = () => {
     price: "",
     description: "",
     paymentLink: "",
+    imageUrl: "",
   });
 
   const generateQRCode = () => {
@@ -218,6 +219,7 @@ const Dashboard = () => {
         price: "",
         description: "",
         paymentLink: "",
+        imageUrl: "",
       });
       setShowAddProductModal(false);
 
@@ -998,6 +1000,21 @@ const Dashboard = () => {
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
+
+              <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Product Image URL
+  </label>
+  <input
+    type="url"
+    value={newProduct.imageUrl}
+    onChange={(e) =>
+      setNewProduct({ ...newProduct, imageUrl: e.target.value })
+    }
+    placeholder="https://example.com/product-image.jpg"
+    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+  />
+</div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
