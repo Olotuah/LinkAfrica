@@ -1,131 +1,154 @@
 import express from "express";
 import cors from "cors";
-import fs from "fs";
-import path from "path";
 import { config } from "dotenv";
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+
+import User from "./models/User.js";
+import Link from "./models/Link.js";
+import Product from "./models/Product.js";
+import { auth } from "./middleware/auth.js";
 
 config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// File paths for persistent storage
-const DATA_DIR = "./data";
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-const LINKS_FILE = path.join(DATA_DIR, "links.json");
-const ANALYTICS_FILE = path.join(DATA_DIR, "analytics.json");
-const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
+/* ===================
+   MONGODB CONNECTION
+   =================== */
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB connected successfully");
+  })
+  .catch((error) => {
+    console.error("❌ MongoDB connection error:", error);
+    process.exit(1);
+  });
 
-// CORS configuration
-const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? [
-          "https://link-africa.vercel.app", // Your actual Vercel domain
-          "https://linkafrica.vercel.app", // Backup domain
-          "https://linkafrika.tech",
-          "https://www.linkafrika.tech",
-          process.env.FRONTEND_URL,
-        ]
-      : [
-          "http://localhost:3000", // React development server URL
-          "http://localhost:5173", // Vite development server URL
-        ],
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
-
-// Create data directory if it doesn't exist
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR);
-}
-
-// Helper functions for file operations
-const loadData = (filePath, defaultData = []) => {
-  try {
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, "utf8");
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error(`Error loading data from ${filePath}:`, error);
-  }
-  return defaultData;
-};
-
-const saveData = (filePath, data) => {
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-    return true;
-  } catch (error) {
-    console.error(`Error saving data to ${filePath}:`, error);
-    return false;
-  }
-};
-
-// Load existing data or initialize empty arrays
-let users = loadData(USERS_FILE, []);
-let links = loadData(LINKS_FILE, []);
-let analytics = loadData(ANALYTICS_FILE, []);
-let products = loadData(PRODUCTS_FILE, []);
-
-console.log(
-  `📊 Loaded ${users.length} users, ${links.length} links, ${products.length} products, ${analytics.length} analytics events`
+/* ===================
+   SIMPLE ANALYTICS MODEL
+   =================== */
+const analyticsSchema = new mongoose.Schema(
+  {
+    event: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    data: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    userAgent: {
+      type: String,
+      default: "",
+    },
+    ip: {
+      type: String,
+      default: "",
+    },
+  },
+  { timestamps: true }
 );
 
-// Middleware
-app.use(express.json());
+const Analytics =
+  mongoose.models.Analytics || mongoose.model("Analytics", analyticsSchema);
 
-// Request logging middleware
+/* ===================
+   HELPERS
+   =================== */
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
+};
+
+const sanitizeUser = async (userId) => {
+  return await User.findById(userId).select("-password");
+};
+
+const makeTempUsername = async (email) => {
+  const base = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "");
+  let candidate = base || `user${Date.now()}`;
+  let counter = 1;
+
+  while (await User.findOne({ username: candidate })) {
+    candidate = `${base}${counter}`;
+    counter += 1;
+  }
+
+  return candidate;
+};
+
+/* ===================
+   CORS
+   =================== */
+const allowedOrigins =
+  process.env.NODE_ENV === "production"
+    ? [
+        "https://link-africa.vercel.app",
+        "https://linkafrica.vercel.app",
+        "https://linkafrika.tech",
+        "https://www.linkafrika.tech",
+        process.env.FRONTEND_URL,
+      ].filter(Boolean)
+    : ["http://localhost:3000", "http://localhost:5173"];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+/* ===================
+   MIDDLEWARE
+   =================== */
+app.use(express.json({ limit: "10mb" }));
+
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
-// Simple auth middleware
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+/* ===================
+   HEALTH / TEST
+   =================== */
+app.get("/health", async (req, res) => {
+  try {
+    const [usersCount, linksCount, productsCount, analyticsCount] =
+      await Promise.all([
+        User.countDocuments(),
+        Link.countDocuments(),
+        Product.countDocuments(),
+        Analytics.countDocuments(),
+      ]);
 
-  if (!token) {
-    return res.status(401).json({ error: "Access token required" });
+    res.json({
+      status: "OK",
+      message: "LinkAfrika API is running!",
+      users: usersCount,
+      links: linksCount,
+      products: productsCount,
+      analytics: analyticsCount,
+      environment: process.env.NODE_ENV || "development",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "ERROR",
+      message: "Health check failed",
+      error: error.message,
+    });
   }
-
-  // Simple token validation (in production, use JWT)
-  const userId = token.replace("linkafrika-token-", "").split("-")[0];
-  const user = users.find((u) => u.id.toString() === userId);
-
-  if (!user) {
-    return res.status(403).json({ error: "Invalid token" });
-  }
-
-  req.user = user;
-  next();
-};
-
-// Health check
-app.get("/health", (req, res) => {
-  res.json({
-    status: "OK",
-    message: "LinkAfrika API is running!",
-    users: users.length,
-    links: links.length,
-    analytics: analytics.length,
-    environment: process.env.NODE_ENV || "development",
-    timestamp: new Date().toISOString(),
-  });
 });
 
-// Test route
 app.get("/test", (req, res) => {
   res.json({
     message: "Hello from LinkAfrika backend!",
     environment: process.env.NODE_ENV || "development",
-    corsOrigin: corsOptions.origin,
     endpoints: [
       "POST /api/auth/register",
       "POST /api/auth/login",
@@ -139,6 +162,7 @@ app.get("/test", (req, res) => {
       "DELETE /api/links/:id",
       "GET /api/products",
       "POST /api/products",
+      "PUT /api/products/:id",
       "DELETE /api/products/:id",
       "GET /api/analytics/stats",
       "POST /api/analytics/track",
@@ -148,813 +172,895 @@ app.get("/test", (req, res) => {
   });
 });
 
-// ===================
-// AUTH ROUTES
-// ===================
+/* ===================
+   AUTH ROUTES
+   =================== */
 
-app.post("/api/auth/register", (req, res) => {
-  console.log("📝 Register request:", req.body);
+// REGISTER
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    console.log("📝 Register request:", req.body);
 
-  const { name, email, password } = req.body;
+    const { name, email, password, username, displayName } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      message: "Name, email, and password are required",
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    const existingUser = await User.findOne({ email: cleanEmail });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "An account with this email already exists",
+      });
+    }
+
+    let finalUsername = username?.trim().toLowerCase();
+    if (!finalUsername) {
+      finalUsername = await makeTempUsername(cleanEmail);
+    }
+
+    const usernameTaken = await User.findOne({ username: finalUsername });
+    if (usernameTaken) {
+      return res.status(400).json({
+        message: "Username is already taken",
+      });
+    }
+
+    const finalDisplayName =
+      displayName?.trim() || name?.trim() || cleanEmail.split("@")[0];
+
+    const newUser = await User.create({
+      username: finalUsername,
+      email: cleanEmail,
+      password,
+      displayName: finalDisplayName,
+      bio: "",
+      avatarUrl: "",
+      isPro: false,
+      theme: "purple",
+      profileViews: 0,
+      lastLoginAt: new Date(),
+    });
+
+    const token = generateToken(newUser._id);
+    const userWithoutPassword = await sanitizeUser(newUser._id);
+
+    res.status(201).json({
+      message: "Account created successfully!",
+      token,
+      user: userWithoutPassword,
+    });
+  } catch (error) {
+    console.error("❌ Register error:", error);
+
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Email or username already exists",
+      });
+    }
+
+    res.status(500).json({
+      message: "Registration failed",
+      error: error.message,
     });
   }
-
-  if (password.length < 6) {
-    return res.status(400).json({
-      message: "Password must be at least 6 characters long",
-    });
-  }
-
-  const existingUser = users.find(
-    (u) => u.email.toLowerCase() === email.toLowerCase()
-  );
-
-  if (existingUser) {
-    return res.status(400).json({
-      message: "An account with this email already exists",
-    });
-  }
-
-  const newUser = {
-    id: Date.now(),
-    name: name.trim(),
-    email: email.toLowerCase().trim(),
-    password,
-    username: null,
-    displayName: name.trim(),
-    bio: "",
-    avatarUrl: "",
-    theme: "purple",
-    isPro: false,
-    onboardingCompleted: false,
-    profileViews: 0,
-    followerCount: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  users.push(newUser);
-
-  if (saveData(USERS_FILE, users)) {
-    console.log("✅ User data saved to file");
-  }
-
-  const token = `linkafrika-token-${newUser.id}-${Date.now()}`;
-
-  const { password: _, ...userWithoutPassword } = newUser;
-
-  res.status(201).json({
-    message: "Account created successfully!",
-    token,
-    user: userWithoutPassword,
-  });
 });
 
-app.post("/api/auth/login", (req, res) => {
-  console.log("🔐 Login request:", req.body);
+// LOGIN
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    console.log("🔐 Login request:", req.body);
 
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({
-      error: "Email and password are required",
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password are required",
+      });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase().trim(),
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        error: "No account found with this email address",
+      });
+    }
+
+    const isPasswordCorrect = await user.comparePassword(password);
+    if (!isPasswordCorrect) {
+      return res.status(400).json({
+        error: "Incorrect password",
+      });
+    }
+
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const token = generateToken(user._id);
+    const userWithoutPassword = await sanitizeUser(user._id);
+
+    console.log("✅ User logged in:", user.email);
+
+    res.json({
+      message: "Login successful!",
+      token,
+      user: userWithoutPassword,
+    });
+  } catch (error) {
+    console.error("❌ Login error:", error);
+    res.status(500).json({
+      error: "Login failed",
+      message: error.message,
     });
   }
-
-  const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-
-  if (!user) {
-    return res.status(400).json({
-      error: "No account found with this email address",
-    });
-  }
-
-  if (user.password !== password) {
-    return res.status(400).json({
-      error: "Incorrect password",
-    });
-  }
-
-  const token = `linkafrika-token-${user.id}-${Date.now()}`;
-
-  console.log("✅ User logged in:", user.email);
-
-  const { password: _, ...userWithoutPassword } = user;
-
-  res.json({
-    message: "Login successful!",
-    token,
-    user: userWithoutPassword,
-  });
 });
 
-// Check username availability
-app.post("/api/auth/check-username", (req, res) => {
-  const { username } = req.body;
+// CHECK USERNAME
+app.post("/api/auth/check-username", async (req, res) => {
+  try {
+    const { username } = req.body;
 
-  if (!username) {
-    return res.status(400).json({
-      error: "Username is required",
+    if (!username) {
+      return res.status(400).json({
+        error: "Username is required",
+        available: false,
+      });
+    }
+
+    const cleanUsername = username.trim().toLowerCase();
+
+    if (cleanUsername.length < 3) {
+      return res.status(400).json({
+        error: "Username must be at least 3 characters long",
+        available: false,
+      });
+    }
+
+    const existingUser = await User.findOne({ username: cleanUsername });
+
+    res.json({
+      available: !existingUser,
+      message: existingUser
+        ? "Username is already taken"
+        : "Username is available!",
     });
-  }
-
-  if (username.length < 3) {
-    return res.status(400).json({
-      error: "Username must be at least 3 characters long",
+  } catch (error) {
+    console.error("❌ Check username error:", error);
+    res.status(500).json({
+      error: "Error checking username",
       available: false,
     });
   }
-
-  // Check if username is already taken
-  const existingUser = users.find(
-    (u) => u.username && u.username.toLowerCase() === username.toLowerCase()
-  );
-
-  const isAvailable = !existingUser;
-
-  res.json({
-    available: isAvailable,
-    message: isAvailable
-      ? "Username is available!"
-      : "Username is already taken",
-  });
 });
 
-// Get current user (for auth validation)
-app.get("/api/auth/me", authenticateToken, (req, res) => {
-  const { password: _, ...userWithoutPassword } = req.user;
-  res.json({
-    user: userWithoutPassword,
-  });
+// GET CURRENT USER
+app.get("/api/auth/me", auth, async (req, res) => {
+  res.json({ user: req.user });
 });
 
-// ===================
-// USER ROUTES
-// ===================
+/* ===================
+   USER ROUTES
+   =================== */
 
-// Get user profile
-app.get("/api/user/profile", authenticateToken, (req, res) => {
-  const { password: _, ...userWithoutPassword } = req.user;
-  res.json(userWithoutPassword);
+// GET USER PROFILE
+app.get("/api/user/profile", auth, async (req, res) => {
+  res.json(req.user);
 });
 
-// Update user profile
-app.put("/api/user/profile", authenticateToken, (req, res) => {
-  console.log("📝 Profile update request:", req.body);
+// UPDATE USER PROFILE
+app.put("/api/user/profile", auth, async (req, res) => {
+  try {
+    console.log("📝 Profile update request:", req.body);
 
-  const {
-    username,
-    displayName,
-    bio,
-    theme,
-    avatarUrl,
-    onboardingCompleted,
-    isPro,
-  } = req.body;
+    const {
+      username,
+      displayName,
+      bio,
+      theme,
+      avatarUrl,
+      onboardingCompleted,
+      isPro,
+      customDomain,
+      showBranding,
+      googleAnalyticsId,
+      facebookPixelId,
+    } = req.body;
 
-  const userIndex = users.findIndex((u) => u.id === req.user.id);
-  if (userIndex === -1) {
-    return res.status(404).json({ error: "User not found" });
+    if (
+      username &&
+      username.trim().toLowerCase() !== (req.user.username || "").toLowerCase()
+    ) {
+      const cleanUsername = username.trim().toLowerCase();
+
+      const existingUser = await User.findOne({
+        username: cleanUsername,
+        _id: { $ne: req.user._id },
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          error: "Username is already taken",
+        });
+      }
+    }
+
+    const updatePayload = {
+      updatedAt: new Date(),
+    };
+
+    if (username !== undefined) updatePayload.username = username.trim().toLowerCase();
+    if (displayName !== undefined) updatePayload.displayName = displayName.trim();
+    if (bio !== undefined) updatePayload.bio = bio.trim();
+    if (theme !== undefined) updatePayload.theme = theme;
+    if (avatarUrl !== undefined) updatePayload.avatarUrl = avatarUrl.trim();
+    if (onboardingCompleted !== undefined)
+      updatePayload.onboardingCompleted = onboardingCompleted;
+    if (isPro !== undefined) updatePayload.isPro = isPro;
+    if (customDomain !== undefined) updatePayload.customDomain = customDomain.trim();
+    if (showBranding !== undefined) updatePayload.showBranding = showBranding;
+    if (googleAnalyticsId !== undefined)
+      updatePayload.googleAnalyticsId = googleAnalyticsId.trim();
+    if (facebookPixelId !== undefined)
+      updatePayload.facebookPixelId = facebookPixelId.trim();
+
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, updatePayload, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
+
+    console.log("✅ User profile updated");
+
+    res.json({
+      message: "Profile updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("❌ Update profile error:", error);
+    res.status(500).json({
+      error: "Failed to update profile",
+      message: error.message,
+    });
   }
+});
 
-  // If username is being updated, check availability
-  if (username && username.trim().toLowerCase() !== (req.user.username || "").toLowerCase()) {
-    const cleanUsername = username.trim().toLowerCase();
+/* ===================
+   LINKS ROUTES
+   =================== */
 
-    const existingUser = users.find(
-      (u) =>
-        u.username &&
-        u.username.toLowerCase() === cleanUsername &&
-        u.id !== req.user.id
+// GET USER LINKS
+app.get("/api/links", auth, async (req, res) => {
+  try {
+    const userLinks = await Link.find({ userId: req.user._id }).sort({
+      createdAt: -1,
+    });
+
+    console.log(`📋 Retrieved ${userLinks.length} links for user:`, req.user.email);
+    res.json(userLinks);
+  } catch (error) {
+    console.error("❌ Get links error:", error);
+    res.status(500).json({
+      error: "Failed to load links",
+      message: error.message,
+    });
+  }
+});
+
+// CREATE LINK
+app.post("/api/links", auth, async (req, res) => {
+  try {
+    console.log("🔗 Create link request:", req.body);
+
+    const { title, url, type, description, isActive = true } = req.body;
+
+    if (!title || !url) {
+      return res.status(400).json({
+        error: "Title and URL are required",
+      });
+    }
+
+    const currentLinksCount = await Link.countDocuments({ userId: req.user._id });
+
+    if (!req.user.isPro && currentLinksCount >= 3) {
+      return res.status(400).json({
+        error: "Free users are limited to 3 links. Upgrade to Pro for unlimited links.",
+      });
+    }
+
+    const newLink = await Link.create({
+      userId: req.user._id,
+      title: title.trim(),
+      url: url.trim(),
+      type: type || "social",
+      description: description ? description.trim() : "",
+      isActive,
+      clicks: 0,
+    });
+
+    console.log("✅ Link created:", newLink.title, "for user:", req.user.email);
+
+    res.status(201).json({
+      message: "Link created successfully",
+      link: newLink,
+    });
+  } catch (error) {
+    console.error("❌ Create link error:", error);
+    res.status(500).json({
+      error: "Failed to create link",
+      message: error.message,
+    });
+  }
+});
+
+// UPDATE LINK
+app.put("/api/links/:id", auth, async (req, res) => {
+  try {
+    const { title, url, type, description, isActive } = req.body;
+
+    const updatePayload = {
+      updatedAt: new Date(),
+    };
+
+    if (title !== undefined) updatePayload.title = title.trim();
+    if (url !== undefined) updatePayload.url = url.trim();
+    if (type !== undefined) updatePayload.type = type;
+    if (description !== undefined) updatePayload.description = description.trim();
+    if (isActive !== undefined) updatePayload.isActive = isActive;
+
+    const updatedLink = await Link.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      updatePayload,
+      { new: true, runValidators: true }
     );
 
-    if (existingUser) {
+    if (!updatedLink) {
+      return res.status(404).json({ error: "Link not found" });
+    }
+
+    console.log("✅ Link updated:", updatedLink.title);
+
+    res.json({
+      message: "Link updated successfully",
+      link: updatedLink,
+    });
+  } catch (error) {
+    console.error("❌ Update link error:", error);
+    res.status(500).json({
+      error: "Failed to update link",
+      message: error.message,
+    });
+  }
+});
+
+// DELETE LINK
+app.delete("/api/links/:id", auth, async (req, res) => {
+  try {
+    const deletedLink = await Link.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+
+    if (!deletedLink) {
+      return res.status(404).json({ error: "Link not found" });
+    }
+
+    console.log("🗑️ Link deleted:", deletedLink.title);
+
+    res.json({
+      message: "Link deleted successfully",
+      link: deletedLink,
+    });
+  } catch (error) {
+    console.error("❌ Delete link error:", error);
+    res.status(500).json({
+      error: "Failed to delete link",
+      message: error.message,
+    });
+  }
+});
+
+/* ===================
+   PRODUCTS ROUTES
+   =================== */
+
+// GET USER PRODUCTS
+app.get("/api/products", auth, async (req, res) => {
+  try {
+    const userProducts = await Product.find({ userId: req.user._id }).sort({
+      createdAt: -1,
+    });
+
+    console.log(
+      `🛍️ Retrieved ${userProducts.length} products for user:`,
+      req.user.email
+    );
+
+    res.json(userProducts);
+  } catch (error) {
+    console.error("❌ Get products error:", error);
+    res.status(500).json({
+      message: "Failed to load products",
+      error: error.message,
+    });
+  }
+});
+
+// CREATE PRODUCT
+app.post("/api/products", auth, async (req, res) => {
+  try {
+    console.log("🛍️ Create product request:", req.body);
+
+    const { type, name, price, description, paymentLink, imageUrl } = req.body;
+
+    if (!name || price === undefined || price === null || Number(price) < 0) {
+      return res.status(400).json({
+        message: "Product name and valid price are required",
+      });
+    }
+
+    if (!req.user.isPro) {
+      return res.status(403).json({
+        message: "Only Pro users can add digital products",
+      });
+    }
+
+    const newProduct = await Product.create({
+      userId: req.user._id,
+      type: type || "ebook",
+      name: name.trim(),
+      price: Number(price),
+      description: description ? description.trim() : "",
+      paymentLink: paymentLink ? paymentLink.trim() : "",
+      imageUrl: imageUrl ? imageUrl.trim() : "",
+      isActive: true,
+    });
+
+    console.log("✅ Product created:", newProduct.name, "for user:", req.user.email);
+
+    res.status(201).json({
+      message: "Product created successfully",
+      product: newProduct,
+    });
+  } catch (error) {
+    console.error("❌ Create product error:", error);
+    res.status(500).json({
+      message: "Failed to create product",
+      error: error.message,
+    });
+  }
+});
+
+// UPDATE PRODUCT
+app.put("/api/products/:id", auth, async (req, res) => {
+  try {
+    const { type, name, price, description, paymentLink, imageUrl, isActive } =
+      req.body;
+
+    const updatePayload = {
+      updatedAt: new Date(),
+    };
+
+    if (type !== undefined) updatePayload.type = type;
+    if (name !== undefined) updatePayload.name = name.trim();
+    if (price !== undefined) updatePayload.price = Number(price);
+    if (description !== undefined) updatePayload.description = description.trim();
+    if (paymentLink !== undefined) updatePayload.paymentLink = paymentLink.trim();
+    if (imageUrl !== undefined) updatePayload.imageUrl = imageUrl.trim();
+    if (isActive !== undefined) updatePayload.isActive = isActive;
+
+    const updatedProduct = await Product.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      updatePayload,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    console.log("✅ Product updated:", updatedProduct.name);
+
+    res.json({
+      message: "Product updated successfully",
+      product: updatedProduct,
+    });
+  } catch (error) {
+    console.error("❌ Update product error:", error);
+    res.status(500).json({
+      message: "Failed to update product",
+      error: error.message,
+    });
+  }
+});
+
+// DELETE PRODUCT
+app.delete("/api/products/:id", auth, async (req, res) => {
+  try {
+    const deletedProduct = await Product.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+
+    if (!deletedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    console.log("🗑️ Product deleted:", deletedProduct.name);
+
+    res.json({
+      message: "Product deleted successfully",
+      product: deletedProduct,
+    });
+  } catch (error) {
+    console.error("❌ Delete product error:", error);
+    res.status(500).json({
+      message: "Failed to delete product",
+      error: error.message,
+    });
+  }
+});
+
+/* ===================
+   ANALYTICS ROUTES
+   =================== */
+
+// GET ANALYTICS STATS
+app.get("/api/analytics/stats", auth, async (req, res) => {
+  try {
+    const userLinks = await Link.find({ userId: req.user._id });
+
+    const totalClicks = userLinks.reduce((sum, link) => sum + (link.clicks || 0), 0);
+    const totalLinks = userLinks.length;
+    const activeLinks = userLinks.filter((link) => link.isActive).length;
+
+    const days = Number(req.query.days || 30);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const linkClickEvents = await Analytics.find({
+      event: "link_click",
+      "data.userId": req.user._id.toString(),
+      createdAt: { $gte: startDate },
+    }).sort({ createdAt: 1 });
+
+    const profileViewEvents = await Analytics.find({
+      event: "profile_view",
+      "data.userId": req.user._id.toString(),
+      createdAt: { $gte: startDate },
+    }).sort({ createdAt: 1 });
+
+    const dailyStatsMap = {};
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const key = date.toISOString().split("T")[0];
+      dailyStatsMap[key] = { date: key, clicks: 0, views: 0 };
+    }
+
+    linkClickEvents.forEach((event) => {
+      const key = new Date(event.createdAt).toISOString().split("T")[0];
+      if (dailyStatsMap[key]) dailyStatsMap[key].clicks += 1;
+    });
+
+    profileViewEvents.forEach((event) => {
+      const key = new Date(event.createdAt).toISOString().split("T")[0];
+      if (dailyStatsMap[key]) dailyStatsMap[key].views += 1;
+    });
+
+    const dailyStats = Object.values(dailyStatsMap);
+
+    const topLink = userLinks.reduce(
+      (top, link) => ((link.clicks || 0) > (top?.clicks || 0) ? link : top),
+      null
+    );
+
+    const profileViews = req.user.profileViews || 0;
+
+    const stats = {
+      totalClicks,
+      totalLinks,
+      activeLinks,
+      profileViews,
+      monthlyGrowth: totalClicks > 0 ? Math.floor(Math.random() * 25) + 5 : 0,
+      earnings: req.user.isPro ? Math.floor(totalClicks * 0.5) : 0,
+      conversionRate:
+        profileViews > 0 ? ((totalClicks / profileViews) * 100).toFixed(1) : "0.0",
+      topLink: topLink ? topLink.title : "None yet",
+      dailyStats,
+    };
+
+    console.log(`📊 Generated analytics for user:`, req.user.email);
+
+    res.json(stats);
+  } catch (error) {
+    console.error("❌ Analytics stats error:", error);
+    res.status(500).json({
+      error: "Failed to load analytics",
+      message: error.message,
+    });
+  }
+});
+
+// TRACK EVENT
+app.post("/api/analytics/track", async (req, res) => {
+  try {
+    const { event, data } = req.body;
+
+    const analyticsEvent = await Analytics.create({
+      event,
+      data,
+      userAgent: req.headers["user-agent"] || "",
+      ip: req.ip || "",
+    });
+
+    console.log("📊 Analytics event tracked:", analyticsEvent.event);
+
+    res.json({
+      message: "Event tracked successfully",
+    });
+  } catch (error) {
+    console.error("❌ Track analytics error:", error);
+    res.status(500).json({
+      message: "Failed to track analytics event",
+      error: error.message,
+    });
+  }
+});
+
+/* ===================
+   PUBLIC ROUTES
+   =================== */
+
+// GET PUBLIC PROFILE
+app.get("/api/public/:username", async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    console.log("🌍 Public profile request for:", username);
+
+    let user = await User.findOne({
+      username: username.toLowerCase(),
+    });
+
+    if (!user) {
+      user = await User.findOne({
+        email: username.toLowerCase(),
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const userLinks = await Link.find({
+      userId: user._id,
+      isActive: true,
+    }).sort({ createdAt: 1 });
+
+    const userProducts = await Product.find({
+      userId: user._id,
+      isActive: true,
+    }).sort({ createdAt: -1 });
+
+    await User.findByIdAndUpdate(user._id, {
+      $inc: { profileViews: 1 },
+    });
+
+    await Analytics.create({
+      event: "profile_view",
+      data: {
+        userId: user._id.toString(),
+        username: user.username,
+      },
+      userAgent: req.headers["user-agent"] || "",
+      ip: req.ip || "",
+    });
+
+    const refreshedUser = await User.findById(user._id);
+
+    const publicProfile = {
+      id: refreshedUser._id,
+      username: refreshedUser.username,
+      displayName: refreshedUser.displayName,
+      bio: refreshedUser.bio || "",
+      avatarUrl: refreshedUser.avatarUrl || "",
+      theme: refreshedUser.theme || "purple",
+      isPro: refreshedUser.isPro || false,
+      profileViews: refreshedUser.profileViews || 0,
+      email: refreshedUser.email,
+      links: userLinks.map((link) => ({
+        id: link._id,
+        title: link.title,
+        url: link.url,
+        type: link.type,
+        description: link.description,
+        clicks: link.clicks,
+        isActive: link.isActive,
+      })),
+      products: userProducts.map((product) => ({
+        id: product._id,
+        type: product.type,
+        name: product.name,
+        price: product.price,
+        description: product.description,
+        paymentLink: product.paymentLink,
+        imageUrl: product.imageUrl || "",
+        isActive: product.isActive,
+        createdAt: product.createdAt,
+      })),
+    };
+
+    console.log(
+      `✅ Public profile served for ${refreshedUser.email} with ${userLinks.length} links and ${userProducts.length} products`
+    );
+
+    res.json(publicProfile);
+  } catch (error) {
+    console.error("❌ Public profile error:", error);
+    res.status(500).json({
+      error: "Failed to load public profile",
+      message: error.message,
+    });
+  }
+});
+
+// TRACK LINK CLICK
+app.post("/api/public/click/:linkId", async (req, res) => {
+  try {
+    const link = await Link.findById(req.params.linkId);
+
+    if (!link) {
+      return res.status(404).json({ error: "Link not found" });
+    }
+
+    link.clicks += 1;
+    link.lastClickedAt = new Date();
+    await link.save();
+
+    await Analytics.create({
+      event: "link_click",
+      data: {
+        linkId: link._id.toString(),
+        linkTitle: link.title,
+        linkUrl: link.url,
+        userId: link.userId.toString(),
+      },
+      userAgent: req.headers["user-agent"] || "",
+      ip: req.ip || "",
+    });
+
+    console.log("📊 Link clicked:", link.title, "- Total clicks:", link.clicks);
+
+    res.json({
+      message: "Click tracked successfully",
+      clicks: link.clicks,
+    });
+  } catch (error) {
+    console.error("❌ Public click error:", error);
+    res.status(500).json({
+      error: "Failed to track click",
+      message: error.message,
+    });
+  }
+});
+
+/* ===================
+   DEBUG ROUTES
+   =================== */
+
+app.get("/api/debug/users", async (req, res) => {
+  try {
+    const users = await User.find().select("-password").sort({ createdAt: -1 });
+
+    res.json({
+      totalUsers: users.length,
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/debug/links", async (req, res) => {
+  try {
+    const links = await Link.find().sort({ createdAt: -1 });
+
+    res.json({
+      totalLinks: links.length,
+      links,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/debug/products", async (req, res) => {
+  try {
+    const products = await Product.find().sort({ createdAt: -1 });
+
+    res.json({
+      totalProducts: products.length,
+      products,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/debug/analytics", async (req, res) => {
+  try {
+    const recentEvents = await Analytics.find().sort({ createdAt: -1 }).limit(10);
+
+    res.json({
+      totalEvents: await Analytics.countDocuments(),
+      recentEvents,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/debug/set-username", async (req, res) => {
+  try {
+    const { email, username } = req.body;
+
+    if (!email || !username) {
+      return res.status(400).json({
+        error: "email and username are required",
+      });
+    }
+
+    const existingUsername = await User.findOne({
+      username: username.toLowerCase().trim(),
+      email: { $ne: email.toLowerCase().trim() },
+    });
+
+    if (existingUsername) {
       return res.status(400).json({
         error: "Username is already taken",
       });
     }
-  }
 
-  // Update user
-  users[userIndex] = {
-    ...users[userIndex],
-    ...(username !== undefined && { username: username.trim().toLowerCase() }),
-    ...(displayName !== undefined && { displayName: displayName.trim() }),
-    ...(bio !== undefined && { bio: bio.trim() }),
-    ...(theme !== undefined && { theme }),
-    ...(avatarUrl !== undefined && { avatarUrl: avatarUrl.trim() }),
-    ...(onboardingCompleted !== undefined && { onboardingCompleted }),
-    ...(isPro !== undefined && { isPro }),
-    updatedAt: new Date().toISOString(),
-  };
+    const updatedUser = await User.findOneAndUpdate(
+      { email: email.toLowerCase().trim() },
+      {
+        username: username.toLowerCase().trim(),
+      },
+      { new: true }
+    ).select("-password");
 
-  // Save to file
-  if (saveData(USERS_FILE, users)) {
-    console.log("✅ User profile updated");
-  }
+    if (!updatedUser) {
+      return res.status(404).json({
+        error: `No user found with email ${email}`,
+      });
+    }
 
-  const { password: _, ...userWithoutPassword } = users[userIndex];
-
-  res.json({
-    message: "Profile updated successfully",
-    user: userWithoutPassword,
-  });
-});
-
-// ===================
-// LINKS ROUTES
-// ===================
-
-// Get user's links
-app.get("/api/links", authenticateToken, (req, res) => {
-  const userLinks = links.filter((link) => link.userId === req.user.id);
-
-  // Sort by creation date (newest first)
-  userLinks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  console.log(
-    `📋 Retrieved ${userLinks.length} links for user:`,
-    req.user.email
-  );
-
-  res.json(userLinks);
-});
-
-// Create new link
-app.post("/api/links", authenticateToken, (req, res) => {
-  console.log("🔗 Create link request:", req.body);
-
-  const { title, url, type, description, isActive = true } = req.body;
-
-  if (!title || !url) {
-    return res.status(400).json({
-      error: "Title and URL are required",
+    res.json({
+      message: "Username updated successfully",
+      user: updatedUser,
     });
+  } catch (error) {
+    console.error("❌ Debug set username error:", error);
+    res.status(500).json({ error: error.message });
   }
-
-  // Check user's link limit (free users limited to 3)
-  const userLinks = links.filter((link) => link.userId === req.user.id);
-
-  if (!req.user.isPro && userLinks.length >= 3) {
-    return res.status(400).json({
-      error:
-        "Free users are limited to 3 links. Upgrade to Pro for unlimited links.",
-    });
-  }
-
-  const newLink = {
-    id: Date.now(),
-    userId: req.user.id,
-    title: title.trim(),
-    url: url.trim(),
-    type: type || "social",
-    description: description ? description.trim() : "",
-    isActive,
-    clicks: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  links.push(newLink);
-
-  // Save to file
-  if (saveData(LINKS_FILE, links)) {
-    console.log("✅ Links data saved to file");
-  }
-
-  console.log("✅ Link created:", newLink.title, "for user:", req.user.email);
-
-  res.status(201).json({
-    message: "Link created successfully",
-    link: newLink,
-  });
 });
 
-// Update link
-app.put("/api/links/:id", authenticateToken, (req, res) => {
-  const linkId = parseInt(req.params.id);
-  const linkIndex = links.findIndex(
-    (link) => link.id === linkId && link.userId === req.user.id
-  );
-
-  if (linkIndex === -1) {
-    return res.status(404).json({ error: "Link not found" });
-  }
-
-  const { title, url, type, description, isActive } = req.body;
-
-  const updatedLink = {
-    ...links[linkIndex],
-    ...(title !== undefined && { title: title.trim() }),
-    ...(url !== undefined && { url: url.trim() }),
-    ...(type !== undefined && { type }),
-    ...(description !== undefined && { description: description.trim() }),
-    ...(isActive !== undefined && { isActive }),
-    updatedAt: new Date().toISOString(),
-  };
-
-  links[linkIndex] = updatedLink;
-
-  // Save to file
-  if (saveData(LINKS_FILE, links)) {
-    console.log("✅ Links data saved to file");
-  }
-
-  console.log("✅ Link updated:", updatedLink.title);
-
-  res.json({
-    message: "Link updated successfully",
-    link: updatedLink,
-  });
-});
-
-// Delete link
-app.delete("/api/links/:id", authenticateToken, (req, res) => {
-  const linkId = parseInt(req.params.id);
-  const linkIndex = links.findIndex(
-    (link) => link.id === linkId && link.userId === req.user.id
-  );
-
-  if (linkIndex === -1) {
-    return res.status(404).json({ error: "Link not found" });
-  }
-
-  const deletedLink = links.splice(linkIndex, 1)[0];
-
-  // Save to file
-  if (saveData(LINKS_FILE, links)) {
-    console.log("✅ Links data saved to file");
-  }
-
-  console.log("🗑️ Link deleted:", deletedLink.title);
-
-  res.json({
-    message: "Link deleted successfully",
-    link: deletedLink,
-  });
-});
-
-// ===================
-// PRODUCTS ROUTES
-// ===================
-
-// Get user's products
-app.get("/api/products", authenticateToken, (req, res) => {
-  const userProducts = products
-    .filter((product) => product.userId === req.user.id)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  console.log(
-    `🛍️ Retrieved ${userProducts.length} products for user:`,
-    req.user.email
-  );
-
-  res.json(userProducts);
-});
-
-// Create new product
-app.post("/api/products", authenticateToken, (req, res) => {
-  console.log("🛍️ Create product request:", req.body);
-
-  const { type, name, price, description, paymentLink, imageUrl } = req.body;
-
-  if (!name || !price) {
-    return res.status(400).json({
-      message: "Product name and price are required",
-    });
-  }
-
-  if (!req.user.isPro) {
-    return res.status(403).json({
-      message: "Only Pro users can add digital products",
-    });
-  }
-
-  const newProduct = {
-    id: Date.now(),
-    userId: req.user.id,
-    type: type || "ebook",
-    name: name.trim(),
-    price: Number(price),
-    description: description ? description.trim() : "",
-    paymentLink: paymentLink ? paymentLink.trim() : "",
-    imageUrl: imageUrl ? imageUrl.trim() : "",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  products.push(newProduct);
-
-  if (saveData(PRODUCTS_FILE, products)) {
-    console.log("✅ Products data saved to file");
-  }
-
-  console.log("✅ Product created:", newProduct.name, "for user:", req.user.email);
-
-  res.status(201).json({
-    message: "Product created successfully",
-    product: newProduct,
-  });
-});
-
-// Update product
-app.put("/api/products/:id", authenticateToken, (req, res) => {
-  const productId = parseInt(req.params.id);
-
-  const productIndex = products.findIndex(
-    (product) => product.id === productId && product.userId === req.user.id
-  );
-
-  if (productIndex === -1) {
-    return res.status(404).json({ message: "Product not found" });
-  }
-
-  const { type, name, price, description, paymentLink, imageUrl, isActive } =
-    req.body;
-
-  products[productIndex] = {
-    ...products[productIndex],
-    ...(type !== undefined && { type }),
-    ...(name !== undefined && { name: name.trim() }),
-    ...(price !== undefined && { price: Number(price) }),
-    ...(description !== undefined && { description: description.trim() }),
-    ...(paymentLink !== undefined && { paymentLink: paymentLink.trim() }),
-    ...(imageUrl !== undefined && { imageUrl: imageUrl.trim() }),
-    ...(isActive !== undefined && { isActive }),
-    updatedAt: new Date().toISOString(),
-  };
-
-  if (saveData(PRODUCTS_FILE, products)) {
-    console.log("✅ Products data saved to file");
-  }
-
-  console.log("✅ Product updated:", products[productIndex].name);
-
-  res.json({
-    message: "Product updated successfully",
-    product: products[productIndex],
-  });
-});
-
-// Delete product
-app.delete("/api/products/:id", authenticateToken, (req, res) => {
-  const productId = parseInt(req.params.id);
-
-  const productIndex = products.findIndex(
-    (product) => product.id === productId && product.userId === req.user.id
-  );
-
-  if (productIndex === -1) {
-    return res.status(404).json({ message: "Product not found" });
-  }
-
-  const deletedProduct = products.splice(productIndex, 1)[0];
-
-  if (saveData(PRODUCTS_FILE, products)) {
-    console.log("✅ Products data saved to file");
-  }
-
-  console.log("🗑️ Product deleted:", deletedProduct.name);
-
-  res.json({
-    message: "Product deleted successfully",
-    product: deletedProduct,
-  });
-});
-
-// ===================
-// ANALYTICS ROUTES
-// ===================
-
-// Get analytics stats
-app.get("/api/analytics/stats", authenticateToken, (req, res) => {
-  const { days = 30 } = req.query;
-
-  const userLinks = links.filter((link) => link.userId === req.user.id);
-  const totalClicks = userLinks.reduce((sum, link) => sum + link.clicks, 0);
-  const totalLinks = userLinks.length;
-  const activeLinks = userLinks.filter((link) => link.isActive).length;
-
-  // Generate realistic daily stats for the last 7 days
-  const dailyStats = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-
-    // Generate more realistic numbers based on actual data
-    const baseClicks = Math.floor(totalClicks / 7);
-    const variance = Math.floor(Math.random() * (baseClicks + 5));
-
-    dailyStats.push({
-      date: date.toISOString().split("T")[0],
-      clicks: Math.max(0, baseClicks + variance - 2),
-      views: Math.floor((baseClicks + variance) * 1.5),
-    });
-  }
-
-  const topLink = userLinks.reduce(
-    (top, link) => (link.clicks > (top?.clicks || 0) ? link : top),
-    null
-  );
-
-  const stats = {
-    totalClicks,
-    totalLinks,
-    activeLinks,
-    profileViews: req.user.profileViews || Math.floor(totalClicks * 1.2),
-    monthlyGrowth: totalClicks > 0 ? Math.floor(Math.random() * 25) + 5 : 0,
-    earnings: req.user.isPro ? Math.floor(totalClicks * 0.5) : 0,
-    conversionRate:
-      totalClicks > 0
-        ? ((totalClicks / Math.max(req.user.profileViews, 100)) * 100).toFixed(
-            1
-          )
-        : "0.0",
-    topLink: topLink ? topLink.title : "None yet",
-    dailyStats,
-  };
-
-  console.log(`📊 Generated analytics for user:`, req.user.email);
-
-  res.json(stats);
-});
-
-// Track analytics event
-app.post("/api/analytics/track", (req, res) => {
-  const { event, data } = req.body;
-
-  const analyticsEvent = {
-    id: Date.now(),
-    event,
-    data,
-    timestamp: new Date().toISOString(),
-    userAgent: req.headers["user-agent"],
-    ip: req.ip,
-  };
-
-  analytics.push(analyticsEvent);
-
-  // Save to file (but don't block response)
-  saveData(ANALYTICS_FILE, analytics);
-
-  console.log("📊 Analytics event tracked:", event);
-
-  res.json({
-    message: "Event tracked successfully",
-  });
-});
-
-// ===================
-// PUBLIC ROUTES
-// ===================
-
-// Get public profile
-app.get("/api/public/:username", (req, res) => {
-  const { username } = req.params;
-
-  console.log("🌍 Public profile request for:", username);
-
-  let user = users.find(
-    (u) => u.username && u.username.toLowerCase() === username.toLowerCase()
-  );
-
-  if (!user) {
-    user = users.find((u) => u.email.toLowerCase() === username.toLowerCase());
-  }
-
-  if (!user) {
-    return res.status(404).json({ error: "Profile not found" });
-  }
-
-  const userLinks = links
-    .filter((link) => link.userId === user.id && link.isActive)
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-  const userProducts = products
-    .filter((product) => product.userId === user.id && product.isActive)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  const userIndex = users.findIndex((u) => u.id === user.id);
-  if (userIndex !== -1) {
-    users[userIndex].profileViews = (users[userIndex].profileViews || 0) + 1;
-    saveData(USERS_FILE, users);
-    user = users[userIndex];
-  }
-
-  const publicProfile = {
-    id: user.id,
-    username: user.username || user.email.split("@")[0],
-    displayName: user.displayName || user.name,
-    bio: user.bio || "",
-    avatarUrl: user.avatarUrl || "",
-    theme: user.theme || "purple",
-    isPro: user.isPro || false,
-    profileViews: user.profileViews || 0,
-    followerCount: user.followerCount || 0,
-    email: user.email,
-    links: userLinks.map((link) => ({
-      id: link.id,
-      title: link.title,
-      url: link.url,
-      type: link.type,
-      description: link.description,
-      clicks: link.clicks,
-      isActive: link.isActive,
-    })),
-    products: userProducts.map((product) => ({
-      id: product.id,
-      type: product.type,
-      name: product.name,
-      price: product.price,
-      description: product.description,
-      paymentLink: product.paymentLink,
-      imageUrl: product.imageUrl || "",
-      isActive: product.isActive,
-      createdAt: product.createdAt,
-    })),
-  };
-
-  console.log(
-    `✅ Public profile served for ${user.email} with ${userLinks.length} links and ${userProducts.length} products`
-  );
-
-  res.json(publicProfile);
-});
-
-// Track link click
-app.post("/api/public/click/:linkId", (req, res) => {
-  const linkId = parseInt(req.params.linkId);
-  const linkIndex = links.findIndex((link) => link.id === linkId);
-
-  if (linkIndex === -1) {
-    return res.status(404).json({ error: "Link not found" });
-  }
-
-  // Increment click count
-  links[linkIndex].clicks += 1;
-
-  // Save to file
-  saveData(LINKS_FILE, links);
-
-  // Track analytics event
-  const analyticsEvent = {
-    id: Date.now(),
-    event: "link_click",
-    data: {
-      linkId: linkId,
-      linkTitle: links[linkIndex].title,
-      linkUrl: links[linkIndex].url,
-      userId: links[linkIndex].userId,
-    },
-    timestamp: new Date().toISOString(),
-    userAgent: req.headers["user-agent"],
-    ip: req.ip,
-  };
-
-  analytics.push(analyticsEvent);
-  saveData(ANALYTICS_FILE, analytics);
-
-  console.log(
-    "📊 Link clicked:",
-    links[linkIndex].title,
-    "- Total clicks:",
-    links[linkIndex].clicks
-  );
-
-  res.json({
-    message: "Click tracked successfully",
-    clicks: links[linkIndex].clicks,
-  });
-});
-
-// ===================
-// DEBUG ROUTES
-// ===================
-
-app.get("/api/debug/users", (req, res) => {
-  res.json({
-    totalUsers: users.length,
-    users: users.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      username: u.username,
-      onboardingCompleted: u.onboardingCompleted,
-      isPro: u.isPro,
-      profileViews: u.profileViews,
-      createdAt: u.createdAt,
-    })),
-  });
-});
-
-app.get("/api/debug/links", (req, res) => {
-  res.json({
-    totalLinks: links.length,
-    links: links.map((l) => ({
-      id: l.id,
-      userId: l.userId,
-      title: l.title,
-      url: l.url,
-      type: l.type,
-      clicks: l.clicks,
-      isActive: l.isActive,
-      createdAt: l.createdAt,
-    })),
-  });
-});
-
-app.get("/api/debug/analytics", (req, res) => {
-  res.json({
-    totalEvents: analytics.length,
-    recentEvents: analytics.slice(-10).map((a) => ({
-      id: a.id,
-      event: a.event,
-      data: a.data,
-      timestamp: a.timestamp,
-    })),
-  });
-});
-
-// Clear all data (be careful!)
-app.post("/api/debug/clear", (req, res) => {
-  const { confirm } = req.body;
-
-  if (confirm !== "CLEAR_ALL_DATA") {
-    return res.status(400).json({
-      error: "Please send { confirm: 'CLEAR_ALL_DATA' } to clear all data",
-    });
-  }
-
-  users.length = 0;
-  links.length = 0;
-  analytics.length = 0;
-  products.length = 0;
-  
-  saveData(PRODUCTS_FILE, products);
-  saveData(USERS_FILE, users);
-  saveData(LINKS_FILE, links);
-  saveData(ANALYTICS_FILE, analytics);
-
-  console.log("🗑️ All data cleared!");
-
-  res.json({
-    message: "All data cleared successfully",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ===================
-// MANUAL USERNAME SETTER (DEBUG)
-// ===================
-
-app.post("/api/debug/set-username", (req, res) => {
-  const { email, username } = req.body;
-
-  if (!email || !username) {
-    return res.status(400).json({
-      error: "email and username are required",
-    });
-  }
-
-  const userIndex = users.findIndex(
-    (u) => u.email.toLowerCase() === email.toLowerCase()
-  );
-
-  if (userIndex === -1) {
-    return res.status(404).json({
-      error: `No user found with email ${email}`,
-    });
-  }
-
-  users[userIndex].username = username.toLowerCase();
-  users[userIndex].updatedAt = new Date().toISOString();
-
-  // Save to file
-  if (saveData(USERS_FILE, users)) {
-    console.log(
-      `✅ Username set for ${email}: ${users[userIndex].username}`
-    );
-  }
-
-  const { password, ...userWithoutPassword } = users[userIndex];
-
-  res.json({
-    message: "Username updated successfully",
-    user: userWithoutPassword,
-  });
-});
-
-
-// ===================
-// ERROR HANDLING
-// ===================
-
-// Error handling middleware
+/* ===================
+   ERROR HANDLING
+   =================== */
 app.use((err, req, res, next) => {
   console.error("❌ Server error:", err);
   res.status(500).json({
@@ -963,45 +1069,21 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({
     error: "Endpoint not found",
-    availableEndpoints: [
-      "GET /health",
-      "GET /test",
-      "POST /api/auth/register",
-      "POST /api/auth/login",
-      "POST /api/auth/check-username",
-      "GET /api/auth/me",
-      "GET /api/user/profile",
-      "PUT /api/user/profile",
-      "GET /api/links",
-      "POST /api/links",
-      "PUT /api/links/:id",
-      "DELETE /api/links/:id",
-      "GET /api/products",
-      "POST /api/products",
-      "DELETE /api/products/:id",
-      "GET /api/analytics/stats",
-      "POST /api/analytics/track",
-      "GET /api/public/:username",
-      "POST /api/public/click/:linkId",
-    ],
   });
 });
 
-// ===================
-// KEEP-ALIVE SYSTEM (Prevents Render Spin-Down)
-// ===================
-
+/* ===================
+   KEEP-ALIVE
+   =================== */
 const KEEP_ALIVE_URL =
   process.env.NODE_ENV === "production"
     ? "https://linkafrica.onrender.com/health"
     : null;
 
 if (KEEP_ALIVE_URL) {
-  // Keep server alive by pinging itself every 8 minutes
   setInterval(async () => {
     try {
       const response = await fetch(KEEP_ALIVE_URL);
@@ -1011,26 +1093,21 @@ if (KEEP_ALIVE_URL) {
     } catch (error) {
       console.log("🏓 Keep-alive ping failed:", error.message);
     }
-  }, 8 * 60 * 1000); // 8 minutes (less than 15-minute Render timeout)
+  }, 8 * 60 * 1000);
 
   console.log("🏓 Keep-alive pinger started - backend will stay awake!");
 }
 
-// ===================
-// SERVER START
-// ===================
-
+/* ===================
+   SERVER START
+   =================== */
 app.listen(PORT, () => {
   console.log(`🚀 LinkAfrika API running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(
-    `📊 Loaded ${users.length} users, ${links.length} links, ${analytics.length} analytics events`
-  );
   console.log(`📖 Health check: http://localhost:${PORT}/health`);
   console.log(`🧪 Test endpoint: http://localhost:${PORT}/test`);
   console.log(`🔗 API Base: http://localhost:${PORT}/api`);
-  console.log(`🐛 Debug endpoints: http://localhost:${PORT}/api/debug/users`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("✅ Server ready! Your Pro features should now work!");
+  console.log("✅ Server ready! MongoDB backend is now active.");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 });
