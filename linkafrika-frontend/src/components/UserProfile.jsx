@@ -17,6 +17,8 @@ import {
   ArrowLeft,
   Share,
   Briefcase,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const UserProfile = () => {
@@ -29,7 +31,9 @@ const UserProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Demo profiles
+  const [previewImage, setPreviewImage] = useState(null);
+  const [previewTitle, setPreviewTitle] = useState("");
+
   if (username === "kemicretes") {
     return <KemiCreatesProfile />;
   }
@@ -37,17 +41,6 @@ const UserProfile = () => {
   if (username === "nelsoncretes") {
     return <NelsonCreatesProfile />;
   }
-
-  const getUserKey = (userObj, prefix = "") => {
-    const identifier = userObj?.email || userObj?.id || userObj?.username;
-
-    if (!identifier) {
-      console.error("❌ No identifier found for user key generation:", userObj);
-      return null;
-    }
-
-    return prefix ? `${prefix}_${identifier}` : identifier;
-  };
 
   useEffect(() => {
     loadUserProfile();
@@ -71,7 +64,6 @@ const UserProfile = () => {
 
       if (!res.ok) {
         if (res.status === 404) {
-          console.error(`❌ No user found with username: ${username}`);
           setError("Profile not found");
           return;
         }
@@ -86,151 +78,29 @@ const UserProfile = () => {
         username: data.username,
         displayName: data.displayName,
         bio: data.bio,
-        avatarUrl: data.avatarUrl,
+        avatarUrl: data.avatarUrl || "",
         theme: data.theme || "purple",
         isPro: data.isPro,
         profileViews: data.profileViews,
         followerCount: data.followerCount,
-        email: data.email,
+        email: data.email || "",
       };
 
-      setUser(publicUser);
-
-      // 1. Links from backend first
-      let links = Array.isArray(data.links)
+      const links = Array.isArray(data.links)
         ? data.links.map((l) => ({
             ...l,
             isActive: l.isActive ?? true,
           }))
         : [];
 
-      // 2. Fallback to localStorage for links if backend has none
-      if (typeof window !== "undefined" && links.length === 0) {
-        console.log(
-          "⚠️ No links returned from backend, trying localStorage fallback..."
-        );
+      const products = Array.isArray(data.products)
+        ? data.products.map((p) => ({
+            ...p,
+            imageUrl: p.imageUrl || "",
+          }))
+        : [];
 
-        const possibleLinkKeys = [];
-
-        if (data.email) possibleLinkKeys.push(`links_${data.email}`);
-        if (data.id) possibleLinkKeys.push(`links_${data.id}`);
-        if (data.username) possibleLinkKeys.push(`links_${data.username}`);
-        if (data.id || data.username) {
-          possibleLinkKeys.push(`links_${data.id || data.username}`);
-        }
-
-        try {
-          const rawSession = localStorage.getItem("user");
-          if (rawSession) {
-            const sessionUser = JSON.parse(rawSession);
-
-            if (sessionUser?.email) {
-              possibleLinkKeys.push(`links_${sessionUser.email}`);
-            }
-            if (sessionUser?.id) {
-              possibleLinkKeys.push(`links_${sessionUser.id}`);
-            }
-            if (sessionUser?.username) {
-              possibleLinkKeys.push(`links_${sessionUser.username}`);
-            }
-          }
-        } catch (e) {
-          console.error("❌ Error reading session user from localStorage:", e);
-        }
-
-        const uniqueLinkKeys = [...new Set(possibleLinkKeys)].filter(
-          (key) => key && key !== "links_undefined" && key !== "links_null"
-        );
-
-        console.log("🔑 Checking localStorage keys for links:", uniqueLinkKeys);
-
-        for (const key of uniqueLinkKeys) {
-          try {
-            const raw = localStorage.getItem(key);
-            if (!raw || raw === "[]") continue;
-
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              console.log(
-                `✅ Found ${parsed.length} links in localStorage under "${key}"`
-              );
-              links = parsed.map((l) => ({
-                ...l,
-                isActive: l.isActive ?? true,
-              }));
-              break;
-            }
-          } catch (err) {
-            console.error(`❌ Error parsing links from "${key}":`, err);
-          }
-        }
-
-        if (!links.length) {
-          console.log("❌ No links found in any localStorage key.");
-        }
-      }
-
-      // 3. Load products from localStorage
-      let products = [];
-
-      if (typeof window !== "undefined") {
-        const possibleProductKeys = [];
-
-        if (data.email) possibleProductKeys.push(`products_${data.email}`);
-        if (data.id) possibleProductKeys.push(`products_${data.id}`);
-        if (data.username) possibleProductKeys.push(`products_${data.username}`);
-
-        try {
-          const rawSession = localStorage.getItem("user");
-          if (rawSession) {
-            const sessionUser = JSON.parse(rawSession);
-
-            if (sessionUser?.email) {
-              possibleProductKeys.push(`products_${sessionUser.email}`);
-            }
-            if (sessionUser?.id) {
-              possibleProductKeys.push(`products_${sessionUser.id}`);
-            }
-            if (sessionUser?.username) {
-              possibleProductKeys.push(`products_${sessionUser.username}`);
-            }
-          }
-        } catch (e) {
-          console.error("❌ Error reading session user for products:", e);
-        }
-
-        const uniqueProductKeys = [...new Set(possibleProductKeys)].filter(
-          (key) => key && key !== "products_undefined" && key !== "products_null"
-        );
-
-        console.log(
-          "🛍️ Checking localStorage keys for products:",
-          uniqueProductKeys
-        );
-
-        for (const key of uniqueProductKeys) {
-          try {
-            const raw = localStorage.getItem(key);
-            if (!raw || raw === "[]") continue;
-
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              console.log(
-                `✅ Found ${parsed.length} products in localStorage under "${key}"`
-              );
-              products = parsed;
-              break;
-            }
-          } catch (err) {
-            console.error(`❌ Error parsing products from "${key}":`, err);
-          }
-        }
-
-        if (!products.length) {
-          console.log("❌ No products found in any localStorage key.");
-        }
-      }
-
+      setUser(publicUser);
       setUserLinks(links);
       setUserProducts(products);
 
@@ -265,30 +135,6 @@ const UserProfile = () => {
       );
       setUserLinks(updatedLinks);
 
-      const userLinksKey = getUserKey(user, "links");
-      if (userLinksKey && typeof window !== "undefined") {
-        const allUserLinks = JSON.parse(
-          localStorage.getItem(userLinksKey) || "[]"
-        );
-        const updatedAllLinks = allUserLinks.map((l) =>
-          l.id === link.id ? { ...l, clicks: (l.clicks || 0) + 1 } : l
-        );
-        localStorage.setItem(userLinksKey, JSON.stringify(updatedAllLinks));
-      }
-
-      const userStatsKey = getUserKey(user, "stats");
-      if (userStatsKey && typeof window !== "undefined") {
-        const currentStats = JSON.parse(
-          localStorage.getItem(userStatsKey) || "{}"
-        );
-        const updatedStats = {
-          ...currentStats,
-          totalClicks: (currentStats.totalClicks || 0) + 1,
-          lastClickDate: new Date().toISOString(),
-        };
-        localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
-      }
-
       window.open(link.url, "_blank");
     } catch (err) {
       console.error("❌ Error tracking click:", err);
@@ -302,21 +148,8 @@ const UserProfile = () => {
         user?.id || user?.email || user?.username,
         "direct"
       );
-
-      const userStatsKey = getUserKey(user, "stats");
-      if (userStatsKey && typeof window !== "undefined") {
-        const currentStats = JSON.parse(
-          localStorage.getItem(userStatsKey) || "{}"
-        );
-        const updatedStats = {
-          ...currentStats,
-          profileViews: (currentStats.profileViews || 0) + 1,
-          lastViewDate: new Date().toISOString(),
-        };
-        localStorage.setItem(userStatsKey, JSON.stringify(updatedStats));
-      }
     }
-  }, [user, loading, error, username]);
+  }, [user, loading, error]);
 
   const handleProductClick = (product) => {
     console.log(`🛍️ Product clicked: ${product.name}`);
@@ -325,6 +158,16 @@ const UserProfile = () => {
     } else {
       alert("Payment link not available for this product");
     }
+  };
+
+  const openImagePreview = (imageUrl, title) => {
+    setPreviewImage(imageUrl);
+    setPreviewTitle(title || "Product image");
+  };
+
+  const closeImagePreview = () => {
+    setPreviewImage(null);
+    setPreviewTitle("");
   };
 
   const shareProfile = () => {
@@ -482,15 +325,23 @@ const UserProfile = () => {
 
       <div className="max-w-lg mx-auto px-4 py-8">
         <div className="text-center mb-8">
-          <div
-            className={`w-24 h-24 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}
-          >
-            <span className="text-white text-2xl font-bold">
-              {(user.displayName || user.username || "U")
-                .charAt(0)
-                .toUpperCase()}
-            </span>
-          </div>
+          {user.avatarUrl ? (
+            <img
+              src={user.avatarUrl}
+              alt={user.displayName || user.username}
+              className="w-24 h-24 rounded-full object-cover mx-auto mb-4 shadow-lg border-4 border-white"
+            />
+          ) : (
+            <div
+              className={`w-24 h-24 bg-gradient-to-r ${themeGradient} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}
+            >
+              <span className="text-white text-2xl font-bold">
+                {(user.displayName || user.username || "U")
+                  .charAt(0)
+                  .toUpperCase()}
+              </span>
+            </div>
+          )}
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             {user.displayName || username}
@@ -529,43 +380,75 @@ const UserProfile = () => {
 
             <div className="mb-8 space-y-3">
               {userProducts.map((product) => (
-                <button
+                <div
                   key={product.id}
-                  onClick={() => handleProductClick(product)}
-                  className="w-full bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-white/60 hover:shadow-lg hover:scale-[1.02] transition-all duration-200 text-left"
+                  className="w-full bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-white/60 shadow-sm"
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        {getProductTypeIcon(product.type)}
-                      </div>
+                  <div className="flex items-start gap-4">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        product.imageUrl &&
+                        openImagePreview(product.imageUrl, product.name)
+                      }
+                      className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 border hover:opacity-90 transition"
+                    >
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-green-50">
+                          <ImageIcon className="w-6 h-6 text-green-500" />
+                        </div>
+                      )}
+                    </button>
 
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 truncate">
-                          {product.name}
-                        </h3>
-
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-green-600 font-bold text-lg">
-                            ₦{parseInt(product.price || 0, 10).toLocaleString()}
-                          </p>
-
-                          <span className="text-xs text-gray-400 capitalize">
-                            {product.type}
-                          </span>
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => handleProductClick(product)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">
+                            {product.name}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-green-600 font-bold text-lg">
+                              ₦
+                              {parseInt(
+                                product.price || 0,
+                                10
+                              ).toLocaleString()}
+                            </span>
+                            <span className="text-xs text-gray-400 capitalize">
+                              {product.type}
+                            </span>
+                          </div>
                         </div>
 
-                        {product.description && (
-                          <p className="text-sm text-gray-500 truncate mt-1">
-                            {product.description}
-                          </p>
-                        )}
+                        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          {getProductTypeIcon(product.type)}
+                        </div>
+                      </div>
+
+                      {product.description && (
+                        <p className="text-sm text-gray-500 mt-2 line-clamp-2">
+                          {product.description}
+                        </p>
+                      )}
+
+                      <div className="mt-3 flex justify-between items-center">
+                        <span className="text-xs text-gray-400">
+                          Tap to open product
+                        </span>
+                        <ExternalLink className="w-4 h-4 text-gray-400" />
                       </div>
                     </div>
-
-                    <ExternalLink className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </>
@@ -625,6 +508,32 @@ const UserProfile = () => {
           </div>
         )}
       </div>
+
+      {previewImage && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="font-semibold text-gray-900 truncate">
+                {previewTitle}
+              </h3>
+              <button
+                onClick={closeImagePreview}
+                className="p-2 rounded-lg hover:bg-gray-100 transition"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 flex items-center justify-center p-4">
+              <img
+                src={previewImage}
+                alt={previewTitle}
+                className="max-h-[70vh] w-auto object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
