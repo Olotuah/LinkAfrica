@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import AnalyticsTracker from "../utils/analytics";
-import KemiCreatesProfile from "./NelsonCreatesProfile";
+import { uploadImageToCloudinary } from "../utils/cloudinaryUpload";
+import { userAPI } from "../utils/api";
+import KemiCreatesProfile from "./KemiCreatesProfile";
 import NelsonCreatesProfile from "./NelsonCreatesProfile";
 import {
   ExternalLink,
@@ -19,11 +22,14 @@ import {
   Briefcase,
   X,
   Image as ImageIcon,
+  Camera,
+  Loader,
 } from "lucide-react";
 
 const UserProfile = () => {
   const { username } = useParams();
   const navigate = useNavigate();
+  const { user: currentUser, updateUser } = useAuth();
 
   const [user, setUser] = useState(null);
   const [userLinks, setUserLinks] = useState([]);
@@ -33,6 +39,7 @@ const UserProfile = () => {
 
   const [previewImage, setPreviewImage] = useState(null);
   const [previewTitle, setPreviewTitle] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   if (username === "kemicretes") {
     return <KemiCreatesProfile />;
@@ -117,6 +124,46 @@ const UserProfile = () => {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setUploadingAvatar(true);
+      setError("");
+
+      console.log("📤 Uploading profile picture...");
+
+      const uploaded = await uploadImageToCloudinary(
+        file,
+        "linkafrika/profile-pictures"
+      );
+
+      const avatarUrl = uploaded.secure_url;
+
+      const response = await userAPI.updateProfile({ avatarUrl });
+      const updatedUser = response.data?.user || response.data;
+
+      console.log("✅ Avatar updated:", updatedUser);
+
+      setUser((prev) => ({
+        ...prev,
+        avatarUrl,
+      }));
+
+      if (updateUser && updatedUser) {
+        updateUser(updatedUser);
+      } else if (updateUser) {
+        updateUser({ avatarUrl });
+      }
+    } catch (err) {
+      console.error("❌ Avatar upload failed:", err);
+      setError(err?.response?.data?.message || "Failed to upload profile image");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleLinkClick = async (link) => {
     try {
       console.log(
@@ -181,9 +228,7 @@ const UserProfile = () => {
           title: `${user.displayName || user.username} - LinkAfrika`,
           text:
             user.bio ||
-            `Check out ${
-              user.displayName || user.username
-            }'s links and products`,
+            `Check out ${user.displayName || user.username}'s links and products`,
           url: profileUrl,
         });
       } else {
@@ -289,19 +334,14 @@ const UserProfile = () => {
   const themeGradient = getThemeGradient(user.theme);
   const themeBackground = getThemeBackground(user.theme);
 
-  const sessionUser =
-    typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("user") || "null")
-      : null;
-
   const isOwnProfile =
-    sessionUser &&
-    ((sessionUser.username &&
+    currentUser &&
+    ((currentUser.username &&
       user?.username &&
-      sessionUser.username.toLowerCase() === user.username.toLowerCase()) ||
-      (sessionUser.email &&
+      currentUser.username.toLowerCase() === user.username.toLowerCase()) ||
+      (currentUser.email &&
         user?.email &&
-        sessionUser.email.toLowerCase() === user.email.toLowerCase()));
+        currentUser.email.toLowerCase() === user.email.toLowerCase()));
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${themeBackground}`}>
@@ -333,17 +373,36 @@ const UserProfile = () => {
 
       <div className="max-w-lg mx-auto px-4 py-8">
         <div className="text-center mb-8">
-          {user.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              alt={user.displayName || user.username}
-              className="w-24 h-24 rounded-full object-cover mx-auto mb-4 shadow-lg border-4 border-white"
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-gray-200 mx-auto mb-4 shadow-lg border-4 border-white flex items-center justify-center overflow-hidden">
-              <ImageIcon className="w-10 h-10 text-gray-400" />
-            </div>
-          )}
+          <div className="relative w-24 h-24 mx-auto mb-4">
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.displayName || user.username}
+                className="w-24 h-24 rounded-full object-cover shadow-lg border-4 border-white"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-gray-200 shadow-lg border-4 border-white flex items-center justify-center overflow-hidden">
+                <ImageIcon className="w-10 h-10 text-gray-400" />
+              </div>
+            )}
+
+            {isOwnProfile && (
+              <label className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-black text-white flex items-center justify-center cursor-pointer shadow-lg hover:bg-gray-800 transition">
+                {uploadingAvatar ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                />
+              </label>
+            )}
+          </div>
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             {user.displayName || username}
