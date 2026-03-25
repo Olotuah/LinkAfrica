@@ -12,17 +12,12 @@ import {
   ArrowLeft,
   AlertCircle,
   CheckCircle,
-  CreditCard,
-  Smartphone,
-  Shield,
 } from "lucide-react";
 
 const OnboardingFlow = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [processingPayment, setProcessingPayment] = useState(false);
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
 
@@ -66,30 +61,36 @@ const OnboardingFlow = () => {
     },
   ];
 
-  // Redirect if already completed onboarding
   useEffect(() => {
     if (user?.onboardingCompleted && user?.username) {
       navigate("/dashboard?welcome=true");
     }
   }, [user, navigate]);
 
-  // Check username availability with debounce
   useEffect(() => {
     if (profileData.username.length >= 3) {
       const timeoutId = setTimeout(() => {
         checkUsernameAvailability(profileData.username);
       }, 500);
+
       return () => clearTimeout(timeoutId);
-    } else {
-      setUsernameStatus({ checking: false, available: null, message: "" });
     }
+
+    setUsernameStatus({
+      checking: false,
+      available: null,
+      message: "",
+    });
   }, [profileData.username]);
 
   const checkUsernameAvailability = async (username) => {
-    setUsernameStatus({ checking: true, available: null, message: "" });
+    setUsernameStatus({
+      checking: true,
+      available: null,
+      message: "",
+    });
 
     try {
-      // First try API check
       try {
         const response = await authAPI.checkUsername(username);
         setUsernameStatus({
@@ -102,7 +103,6 @@ const OnboardingFlow = () => {
         console.log("API username check failed, using localStorage fallback");
       }
 
-      // FALLBACK: Check localStorage users array
       let users = [];
       try {
         users = JSON.parse(localStorage.getItem("users") || "[]");
@@ -111,7 +111,6 @@ const OnboardingFlow = () => {
         users = [];
       }
 
-      // Check if username is taken by any user
       const usernameTaken = users.some(
         (u) => u.username && u.username.toLowerCase() === username.toLowerCase()
       );
@@ -150,12 +149,12 @@ const OnboardingFlow = () => {
       return false;
     }
 
-    if (!profileData.displayName) {
+    if (!profileData.displayName.trim()) {
       setError("Display name is required");
       return false;
     }
 
-    if (!usernameStatus.available) {
+    if (usernameStatus.available !== true) {
       setError("Please choose an available username");
       return false;
     }
@@ -165,133 +164,104 @@ const OnboardingFlow = () => {
 
   const handleNext = async () => {
     setError("");
-    setIsLoading(true);
 
     try {
       if (currentStep === 1 && !validateStep1()) {
-        setIsLoading(false);
         return;
       }
 
       if (currentStep === 4) {
-        // If Pro is selected, show payment modal
-        if (profileData.isPro) {
-          setShowPaymentModal(true);
-          setIsLoading(false);
-        } else {
-          // Complete onboarding for free users
-          await completeOnboarding();
-        }
-      } else {
-        setCurrentStep(currentStep + 1);
+        await completeOnboarding();
+        return;
       }
+
+      setCurrentStep((prev) => prev + 1);
     } catch (error) {
       console.error("Error in onboarding:", error);
       setError("Something went wrong. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const processPayment = async (paymentMethod) => {
-    setProcessingPayment(true);
-
-    try {
-      // Simulate payment processing
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      console.log(`Processing ${paymentMethod} payment for Pro upgrade`);
-
-      // Close payment modal
-      setShowPaymentModal(false);
-
-      // Complete onboarding with Pro status
-      await completeOnboarding();
-    } catch (error) {
-      console.error("Payment error:", error);
-      setError("Payment failed. Please try again.");
-    } finally {
-      setProcessingPayment(false);
     }
   };
 
   const completeOnboarding = async () => {
-  try {
-    setIsLoading(true);
-    setError("");
+    try {
+      setIsLoading(true);
+      setError("");
 
-    console.log("🚀 Starting onboarding completion...");
-    console.log("📝 Profile data to save:", profileData);
+      console.log("🚀 Starting onboarding completion...");
+      console.log("📝 Profile data to save:", profileData);
 
-    const updateData = {
-      username: profileData.username.trim().toLowerCase(),
-      displayName: profileData.displayName.trim(),
-      bio: profileData.bio.trim(),
-      theme: profileData.theme,
-      isPro: profileData.isPro,
-      onboardingCompleted: true,
-    };
-
-    console.log("📝 Sending profile update to backend:", updateData);
-
-    // 1. Update profile in backend
-    const profileResponse = await userAPI.updateProfile(updateData);
-    const apiUser = profileResponse.data?.user;
-
-    if (!apiUser) {
-      throw new Error("Failed to retrieve updated user profile");
-    }
-
-    console.log("✅ Backend profile updated:", apiUser);
-
-    // 2. Create onboarding links FIRST before updating auth context
-    const enabledLinks = initialLinks.filter(
-      (link) => link.enabled && link.url.trim()
-    );
-
-    const linksToCreate = apiUser.isPro
-      ? enabledLinks
-      : enabledLinks.slice(0, 3);
-
-    for (const link of linksToCreate) {
-      const normalizedType =
-        link.type === "instagram" ? "social" : link.type;
-
-      const linkPayload = {
-        title: link.title,
-        url: link.url.trim(),
-        type: normalizedType,
-        description: `My ${link.title} profile`,
+      const updateData = {
+        username: profileData.username.trim().toLowerCase(),
+        displayName: profileData.displayName.trim(),
+        bio: profileData.bio.trim(),
+        theme: profileData.theme,
+        isPro: profileData.isPro,
+        onboardingCompleted: true,
+        proSource: profileData.isPro ? "early_access" : "free",
+        earlyAccessGrantedAt: profileData.isPro
+          ? new Date().toISOString()
+          : null,
       };
 
-      const response = await linksAPI.createLink(linkPayload);
-      console.log("✅ Created onboarding link:", response.data?.link || linkPayload);
+      console.log("📝 Sending profile update to backend:", updateData);
+
+      const profileResponse = await userAPI.updateProfile(updateData);
+      const apiUser = profileResponse.data?.user;
+
+      if (!apiUser) {
+        throw new Error("Failed to retrieve updated user profile");
+      }
+
+      console.log("✅ Backend profile updated:", apiUser);
+
+      const enabledLinks = initialLinks.filter(
+        (link) => link.enabled && link.url.trim()
+      );
+
+      const linksToCreate = apiUser.isPro
+        ? enabledLinks
+        : enabledLinks.slice(0, 3);
+
+      for (const link of linksToCreate) {
+        const normalizedType =
+          link.type === "instagram" ? "social" : link.type;
+
+        const linkPayload = {
+          title: link.title,
+          url: link.url.trim(),
+          type: normalizedType,
+          description: `My ${link.title} profile`,
+        };
+
+        const response = await linksAPI.createLink(linkPayload);
+        console.log(
+          "✅ Created onboarding link:",
+          response.data?.link || linkPayload
+        );
+      }
+
+      if (updateUser && typeof updateUser === "function") {
+        updateUser(apiUser);
+      }
+
+      localStorage.setItem("user", JSON.stringify(apiUser));
+
+      console.log("🎉 Onboarding completed successfully!");
+      navigate("/dashboard?welcome=true");
+    } catch (error) {
+      console.error("❌ Error completing onboarding:", error);
+
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error.message ||
+        "Setup failed. Please refresh the page and try again.";
+
+      setError(message);
+    } finally {
+      setIsLoading(false);
     }
-
-    // 3. NOW update auth context + localStorage
-    if (updateUser && typeof updateUser === "function") {
-      updateUser(apiUser);
-    }
-
-    localStorage.setItem("user", JSON.stringify(apiUser));
-
-    console.log("🎉 Onboarding completed successfully!");
-    navigate("/dashboard?welcome=true");
-  } catch (error) {
-    console.error("❌ Error completing onboarding:", error);
-
-    const message =
-      error?.response?.data?.message ||
-      error?.response?.data?.error ||
-      error.message ||
-      "Setup failed. Please refresh the page and try again.";
-
-    setError(message);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   const renderStep1 = () => (
     <div className="space-y-6">
@@ -310,6 +280,7 @@ const OnboardingFlow = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Choose Your Username *
           </label>
+
           <div className="relative">
             <input
               type="text"
@@ -329,15 +300,18 @@ const OnboardingFlow = () => {
                   : "border-gray-300"
               }`}
             />
+
             <div className="absolute left-3 top-3 text-gray-500 text-sm">
               linkafrika.com/
             </div>
+
             {usernameStatus.checking && (
               <div className="absolute right-3 top-3">
-                <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
           </div>
+
           {usernameStatus.message && (
             <p
               className={`text-xs mt-1 ${
@@ -347,6 +321,7 @@ const OnboardingFlow = () => {
               {usernameStatus.message}
             </p>
           )}
+
           <p className="text-xs text-gray-500 mt-1">
             3+ characters, letters, numbers, _ and - only
           </p>
@@ -360,7 +335,10 @@ const OnboardingFlow = () => {
             type="text"
             value={profileData.displayName}
             onChange={(e) =>
-              setProfileData({ ...profileData, displayName: e.target.value })
+              setProfileData({
+                ...profileData,
+                displayName: e.target.value,
+              })
             }
             placeholder="Your full name or brand"
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -375,7 +353,10 @@ const OnboardingFlow = () => {
             rows="3"
             value={profileData.bio}
             onChange={(e) =>
-              setProfileData({ ...profileData, bio: e.target.value })
+              setProfileData({
+                ...profileData,
+                bio: e.target.value,
+              })
             }
             placeholder="Tell people what you do... 📸 Photographer | 🎨 Creator"
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -435,8 +416,8 @@ const OnboardingFlow = () => {
 
       <div className="bg-gray-50 rounded-lg p-4">
         <p className="text-sm text-gray-600">
-          💡 Don't worry, you can add more links and customize everything later
-          in your dashboard!
+          💡 Don&apos;t worry, you can add more links and customize everything
+          later in your dashboard!
         </p>
       </div>
     </div>
@@ -458,6 +439,7 @@ const OnboardingFlow = () => {
         {themes.map((theme) => (
           <button
             key={theme.id}
+            type="button"
             onClick={() => setProfileData({ ...profileData, theme: theme.id })}
             className={`p-4 rounded-lg border-2 transition-all ${
               profileData.theme === theme.id
@@ -475,9 +457,9 @@ const OnboardingFlow = () => {
         ))}
       </div>
 
-      {/* Preview */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h3 className="font-medium text-gray-900 mb-3">Preview</h3>
+
         <div className="text-center">
           <div
             className={`w-16 h-16 bg-gradient-to-r ${
@@ -488,14 +470,15 @@ const OnboardingFlow = () => {
               {profileData.displayName.charAt(0) || "U"}
             </span>
           </div>
+
           <h4 className="font-semibold text-gray-900">
             {profileData.displayName || "Your Name"}
           </h4>
+
           <p className="text-sm text-gray-600 mt-1">
             {profileData.bio || "Your bio will appear here"}
           </p>
 
-          {/* Show preview links */}
           <div className="mt-4 space-y-2">
             {initialLinks
               .filter((link) => link.enabled && link.url)
@@ -510,6 +493,7 @@ const OnboardingFlow = () => {
                   {link.title}
                 </div>
               ))}
+
             {initialLinks.filter((link) => link.enabled && link.url).length >
               2 && (
               <div className="text-xs text-gray-500">
@@ -540,8 +524,8 @@ const OnboardingFlow = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Free Plan */}
         <button
+          type="button"
           onClick={() => setProfileData({ ...profileData, isPro: false })}
           className={`border-2 rounded-lg p-6 transition-all text-left ${
             !profileData.isPro
@@ -554,6 +538,7 @@ const OnboardingFlow = () => {
               Free Forever
             </h3>
             <div className="text-3xl font-bold text-gray-900 mb-4">₦0</div>
+
             <ul className="text-sm text-gray-600 space-y-2 mb-4">
               <li className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
@@ -568,6 +553,7 @@ const OnboardingFlow = () => {
                 Mobile optimized
               </li>
             </ul>
+
             {!profileData.isPro && (
               <div className="inline-flex items-center text-orange-600 text-sm font-medium">
                 <CheckCircle className="w-4 h-4 mr-1" />
@@ -577,8 +563,8 @@ const OnboardingFlow = () => {
           </div>
         </button>
 
-        {/* Pro Plan */}
         <button
+          type="button"
           onClick={() => setProfileData({ ...profileData, isPro: true })}
           className={`border-2 rounded-lg p-6 transition-all text-left relative ${
             profileData.isPro
@@ -588,15 +574,21 @@ const OnboardingFlow = () => {
         >
           <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
             <span className="bg-gradient-to-r from-orange-500 to-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">
-              7-Day Free Trial
+              Early Access
             </span>
           </div>
+
           <div className="text-center">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Pro Creator
+              Pro Early Access
             </h3>
-            <div className="text-3xl font-bold text-gray-900 mb-1">₦3,000</div>
-            <div className="text-sm text-gray-500 mb-4">per month</div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">
+              Free for now
+            </div>
+            <div className="text-sm text-gray-500 mb-4">
+              Limited-time access
+            </div>
+
             <ul className="text-sm text-gray-600 space-y-2 mb-4">
               <li className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
@@ -615,6 +607,7 @@ const OnboardingFlow = () => {
                 Advanced analytics
               </li>
             </ul>
+
             {profileData.isPro && (
               <div className="inline-flex items-center text-orange-600 text-sm font-medium">
                 <CheckCircle className="w-4 h-4 mr-1" />
@@ -625,17 +618,20 @@ const OnboardingFlow = () => {
         </button>
       </div>
 
-      {/* Show summary of what will be created */}
       <div className="bg-gray-50 rounded-lg p-4">
         <h4 className="font-medium text-gray-900 mb-2">
-          What we'll create for you:
+          What we&apos;ll create for you:
         </h4>
+
         <ul className="text-sm text-gray-600 space-y-1">
           <li>✅ Profile: linkafrika.com/{profileData.username}</li>
           <li>
             ✅ Theme: {themes.find((t) => t.id === profileData.theme)?.name}
           </li>
-          <li>✅ Plan: {profileData.isPro ? "Pro Creator" : "Free Forever"}</li>
+          <li>
+            ✅ Plan: {profileData.isPro ? "Pro Early Access" : "Free Forever"}
+          </li>
+
           {initialLinks.filter((link) => link.enabled && link.url).length >
             0 && (
             <li>
@@ -652,7 +648,6 @@ const OnboardingFlow = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50 py-12 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Progress bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-500">
@@ -662,6 +657,7 @@ const OnboardingFlow = () => {
               {Math.round((currentStep / 4) * 100)}% Complete
             </span>
           </div>
+
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
               className="bg-gradient-to-r from-orange-500 to-green-500 h-2 rounded-full transition-all duration-300"
@@ -670,9 +666,7 @@ const OnboardingFlow = () => {
           </div>
         </div>
 
-        {/* Main content */}
         <div className="bg-white rounded-2xl shadow-lg p-8">
-          {/* Error message */}
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center">
               <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
@@ -685,13 +679,13 @@ const OnboardingFlow = () => {
           {currentStep === 3 && renderStep3()}
           {currentStep === 4 && renderStep4()}
 
-          {/* Navigation buttons */}
           <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
             <button
+              type="button"
               onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-              disabled={currentStep === 1}
+              disabled={currentStep === 1 || isLoading}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                currentStep === 1
+                currentStep === 1 || isLoading
                   ? "text-gray-400 cursor-not-allowed"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
               }`}
@@ -701,6 +695,7 @@ const OnboardingFlow = () => {
             </button>
 
             <button
+              type="button"
               onClick={handleNext}
               disabled={
                 isLoading ||
@@ -718,7 +713,7 @@ const OnboardingFlow = () => {
                   <span>
                     {currentStep === 4
                       ? profileData.isPro
-                        ? "Start Pro Trial"
+                        ? "Get Early Access"
                         : "Complete Setup"
                       : "Continue"}
                   </span>
@@ -728,10 +723,10 @@ const OnboardingFlow = () => {
             </button>
           </div>
 
-          {/* Skip option */}
           {currentStep < 4 && (
             <div className="text-center mt-4">
               <button
+                type="button"
                 onClick={() => navigate("/dashboard")}
                 className="text-sm text-gray-500 hover:text-gray-700 underline"
               >
@@ -741,73 +736,6 @@ const OnboardingFlow = () => {
           )}
         </div>
       </div>
-
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">
-              Start Your Pro Trial
-            </h3>
-
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-medium">LinkAfrika Pro</span>
-                <span className="font-bold">₦3,000/month</span>
-              </div>
-              <div className="text-sm text-gray-600">
-                <span className="text-green-600 font-medium">
-                  7-day free trial
-                </span>
-                <span> • Cancel anytime</span>
-              </div>
-            </div>
-
-            <div className="space-y-3 mb-6">
-              <button
-                onClick={() => processPayment("paystack")}
-                disabled={processingPayment}
-                className="w-full flex items-center justify-center space-x-3 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                <CreditCard className="w-5 h-5" />
-                <span>
-                  {processingPayment ? "Processing..." : "Pay with Paystack"}
-                </span>
-              </button>
-
-              <button
-                onClick={() => processPayment("bank")}
-                disabled={processingPayment}
-                className="w-full flex items-center justify-center space-x-3 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-              >
-                <Smartphone className="w-5 h-5" />
-                <span>
-                  {processingPayment ? "Processing..." : "Bank Transfer"}
-                </span>
-              </button>
-            </div>
-
-            <div className="text-center">
-              <button
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setProfileData({ ...profileData, isPro: false });
-                }}
-                className="text-gray-600 hover:text-gray-900 text-sm"
-              >
-                Continue with Free plan instead
-              </button>
-            </div>
-
-            <div className="mt-6 text-center">
-              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                <Shield className="w-4 h-4" />
-                <span>Secure payment powered by Paystack</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
