@@ -73,7 +73,6 @@ const Dashboard = () => {
     price: "",
     description: "",
     paymentLink: "",
-  
   });
 
   const generateQRCode = () => {
@@ -118,177 +117,173 @@ const Dashboard = () => {
   }, [isAuthenticated, user, navigate]);
 
   const loadDashboardData = async () => {
-  try {
-    setIsLoading(true);
-    setError("");
+    try {
+      setIsLoading(true);
+      setError("");
 
-    console.log("📊 Loading dashboard data for user:", user?.email);
+      console.log("📊 Loading dashboard data for user:", user?.email);
 
-    const [linksResponse, statsResponse, productsResponse] = await Promise.all([
-      linksAPI.getLinks(),
-      analyticsAPI.getStats(30),
-      productsAPI.getProducts(),
-    ]);
+      const [linksResponse, statsResponse, productsResponse] = await Promise.all(
+        [linksAPI.getLinks(), analyticsAPI.getStats(30), productsAPI.getProducts()]
+      );
 
-    const fetchedLinks = Array.isArray(linksResponse.data)
-      ? linksResponse.data.map((link) => ({
-          ...link,
-          id: link.id || link._id,
-        }))
-      : [];
+      const fetchedLinks = Array.isArray(linksResponse.data)
+        ? linksResponse.data.map((link) => ({
+            ...link,
+            id: link.id || link._id,
+          }))
+        : [];
 
-    const fetchedProducts = Array.isArray(productsResponse.data)
-      ? productsResponse.data.map((product) => ({
-          ...product,
-          id: product.id || product._id,
-        }))
-      : [];
+      const fetchedProducts = Array.isArray(productsResponse.data)
+        ? productsResponse.data.map((product) => ({
+            ...product,
+            id: product.id || product._id,
+          }))
+        : [];
 
-    setUserLinks(fetchedLinks);
-    setUserProducts(fetchedProducts);
+      setUserLinks(fetchedLinks);
+      setUserProducts(fetchedProducts);
 
-    setStats({
-      ...statsResponse.data,
-      totalLinks: fetchedLinks.length,
-      activeLinks: fetchedLinks.filter((link) => link.isActive).length,
-    });
+      setStats({
+        ...statsResponse.data,
+        totalLinks: fetchedLinks.length,
+        activeLinks: fetchedLinks.filter((link) => link.isActive).length,
+      });
 
-    console.log("✅ Dashboard data loaded from backend");
-    console.log(`🔗 Links: ${fetchedLinks.length}`);
-    console.log(`🛍️ Products: ${fetchedProducts.length}`);
-  } catch (error) {
-    console.error("❌ Error loading dashboard data:", error);
-    setError(
-      error?.response?.data?.message || "Failed to load dashboard data"
-    );
-  } finally {
-    setIsLoading(false);
-  }
-};
+      console.log("✅ Dashboard data loaded from backend");
+      console.log(`🔗 Links: ${fetchedLinks.length}`);
+      console.log(`🛍️ Products: ${fetchedProducts.length}`);
+    } catch (error) {
+      console.error("❌ Error loading dashboard data:", error);
+      setError(error?.response?.data?.message || "Failed to load dashboard data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAddLink = async () => {
-  if (!newLink.title || !newLink.url) {
-    setError("Please fill in title and URL");
-    return;
-  }
-
-  if (!user?.isPro && userLinks.length >= 3) {
-    setShowUpgradePrompt(true);
-    return;
-  }
-
-  try {
-    setError("");
-    console.log("🔗 Adding new link for user:", user?.email);
-
-    const response = await linksAPI.createLink(newLink);
-
-    const createdLink = {
-      ...response.data.link,
-      id: response.data.link.id || response.data.link._id,
-    };
-
-    setUserLinks((prev) => [createdLink, ...prev]);
-
-    setNewLink({
-      title: "",
-      url: "",
-      type: "social",
-      description: "",
-    });
-    setShowAddLinkModal(false);
-
-    setStats((prev) => ({
-      ...prev,
-      totalLinks: prev.totalLinks + 1,
-      activeLinks: prev.activeLinks + 1,
-    }));
-
-    console.log("✅ Link added successfully");
-  } catch (error) {
-    console.error("❌ Error adding link:", error);
-    setError(error?.response?.data?.message || "Failed to add link");
-  }
-};
-
-  const handleAddProduct = async () => {
-  if (!newProduct.name || !newProduct.price) {
-    setError("Please fill in product name and price");
-    return;
-  }
-
-  try {
-    setError("");
-
-    let imageUrl = "";
-
-    if (productImageFile) {
-      const uploaded = await uploadImageToCloudinary(
-        productImageFile,
-        "linkafrika/product-images"
-      );
-      imageUrl = uploaded.secure_url;
+    if (!newLink.title || !newLink.url) {
+      setError("Please fill in title and URL");
+      return;
     }
 
-    const payload = {
-      ...newProduct,
-      imageUrl,
-    };
+    if (!user?.isPro && userLinks.length >= 3) {
+      setShowUpgradePrompt(true);
+      return;
+    }
 
-    const response = await productsAPI.createProduct(payload);
-    const createdProduct = response.data.product;
+    try {
+      setError("");
+      console.log("🔗 Adding new link for user:", user?.email);
 
-    setUserProducts((prev) => [createdProduct, ...prev]);
+      const response = await linksAPI.createLink(newLink);
 
-    setNewProduct({
-      type: "ebook",
-      name: "",
-      price: "",
-      description: "",
-      paymentLink: "",
-      imageUrl: "",
-    });
-    setProductImageFile(null);
-    setShowAddProductModal(false);
-  } catch (error) {
-    console.error("❌ Error adding product:", error);
-    setError(error?.response?.data?.message || "Failed to add product");
-  }
-};
+      const createdLink = {
+        ...response.data.link,
+        id: response.data.link.id || response.data.link._id,
+      };
+
+      setUserLinks((prev) => [createdLink, ...prev]);
+
+      setNewLink({
+        title: "",
+        url: "",
+        type: "social",
+        description: "",
+      });
+      setShowAddLinkModal(false);
+
+      setStats((prev) => ({
+        ...prev,
+        totalLinks: prev.totalLinks + 1,
+        activeLinks: prev.activeLinks + 1,
+      }));
+
+      console.log("✅ Link added successfully");
+    } catch (error) {
+      console.error("❌ Error adding link:", error);
+      setError(error?.response?.data?.message || "Failed to add link");
+    }
+  };
+
+  const handleAddProduct = async () => {
+    if (!newProduct.name || !newProduct.price) {
+      setError("Please fill in product name and price");
+      return;
+    }
+
+    try {
+      setError("");
+
+      let imageUrl = "";
+
+      if (productImageFile) {
+        const uploaded = await uploadImageToCloudinary(
+          productImageFile,
+          "linkafrika/product-images"
+        );
+        imageUrl = uploaded.secure_url;
+      }
+
+      const payload = {
+        ...newProduct,
+        imageUrl,
+      };
+
+      const response = await productsAPI.createProduct(payload);
+      const createdProduct = response.data.product;
+
+      setUserProducts((prev) => [createdProduct, ...prev]);
+
+      setNewProduct({
+        type: "ebook",
+        name: "",
+        price: "",
+        description: "",
+        paymentLink: "",
+        imageUrl: "",
+      });
+      setProductImageFile(null);
+      setShowAddProductModal(false);
+    } catch (error) {
+      console.error("❌ Error adding product:", error);
+      setError(error?.response?.data?.message || "Failed to add product");
+    }
+  };
 
   const handleEditLink = (link) => {
     setEditingLink({ ...link });
   };
 
   const handleSaveEdit = async () => {
-  if (!editingLink.title || !editingLink.url) {
-    setError("Please fill in title and URL");
-    return;
-  }
+    if (!editingLink.title || !editingLink.url) {
+      setError("Please fill in title and URL");
+      return;
+    }
 
-  try {
-    setError("");
+    try {
+      setError("");
 
-    const response = await linksAPI.updateLink(editingLink.id, editingLink);
+      const response = await linksAPI.updateLink(editingLink.id, editingLink);
 
-    const updatedLink = {
-      ...response.data.link,
-      id: response.data.link.id || response.data.link._id,
-    };
+      const updatedLink = {
+        ...response.data.link,
+        id: response.data.link.id || response.data.link._id,
+      };
 
-    const updatedLinks = userLinks.map((link) =>
-      link.id === editingLink.id ? updatedLink : link
-    );
+      const updatedLinks = userLinks.map((link) =>
+        link.id === editingLink.id ? updatedLink : link
+      );
 
-    setUserLinks(updatedLinks);
-    setEditingLink(null);
+      setUserLinks(updatedLinks);
+      setEditingLink(null);
 
-    console.log("✅ Link updated successfully");
-  } catch (error) {
-    console.error("❌ Error updating link:", error);
-    setError(error?.response?.data?.message || "Failed to update link");
-  }
-};
+      console.log("✅ Link updated successfully");
+    } catch (error) {
+      console.error("❌ Error updating link:", error);
+      setError(error?.response?.data?.message || "Failed to update link");
+    }
+  };
 
   const handleCancelEdit = () => {
     setEditingLink(null);
@@ -321,44 +316,42 @@ const Dashboard = () => {
   };
 
   const handleAvatarUploadAndSave = async () => {
-  try {
-    if (!avatarFile) {
-      setError("Please choose an image first");
-      return;
-    }
-
-    setUploadingAvatar(true);
-    setError("");
-
-    const uploaded = await uploadImageToCloudinary(
-      avatarFile,
-      "linkafrika/profile-pictures"
-    );
-
-    const avatarUrl = uploaded.secure_url;
-
-    const response = await userAPI.updateProfile({ avatarUrl });
-    const updatedUser = response.data?.user;
-
-    if (updatedUser) {
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-
-      if (typeof updateUser === "function") {
-        updateUser(updatedUser);
+    try {
+      if (!avatarFile) {
+        setError("Please choose an image first");
+        return;
       }
-    }
 
-    setAvatarFile(null);
-    alert("Profile picture updated successfully!");
-  } catch (error) {
-    console.error("❌ Avatar upload failed:", error);
-    setError(
-      error?.response?.data?.message || "Failed to upload profile picture"
-    );
-  } finally {
-    setUploadingAvatar(false);
-  }
-};
+      setUploadingAvatar(true);
+      setError("");
+
+      const uploaded = await uploadImageToCloudinary(
+        avatarFile,
+        "linkafrika/profile-pictures"
+      );
+
+      const avatarUrl = uploaded.secure_url;
+
+      const response = await userAPI.updateProfile({ avatarUrl });
+      const updatedUser = response.data?.user;
+
+      if (updatedUser) {
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+
+        if (typeof updateUser === "function") {
+          updateUser(updatedUser);
+        }
+      }
+
+      setAvatarFile(null);
+      alert("Profile picture updated successfully!");
+    } catch (error) {
+      console.error("❌ Avatar upload failed:", error);
+      setError(error?.response?.data?.message || "Failed to upload profile picture");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleDeleteProduct = async (id) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -539,7 +532,8 @@ const Dashboard = () => {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold mb-2 break-words">
-                Welcome back, {user?.displayName || user?.username || user?.email || "User"}! 👋
+                Welcome back,{" "}
+                {user?.displayName || user?.username || user?.email || "User"}! 👋
               </h1>
               <p className="opacity-90 text-sm">
                 Manage your links and grow your online presence
@@ -654,9 +648,7 @@ const Dashboard = () => {
                 Manage Links
               </h2>
               <p className="text-sm text-gray-500">
-                {user?.isPro
-                  ? "Unlimited links"
-                  : `${userLinks.length}/3 links used`}
+                {user?.isPro ? "Unlimited links" : `${userLinks.length}/3 links used`}
               </p>
             </div>
             <button
@@ -738,9 +730,7 @@ const Dashboard = () => {
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <div className="w-6 h-6 text-gray-400 flex-shrink-0">
-                            {linkTypeIcons[link.type] || (
-                              <Globe className="w-4 h-4" />
-                            )}
+                            {linkTypeIcons[link.type] || <Globe className="w-4 h-4" />}
                           </div>
                           <span className="text-gray-600 text-sm flex-shrink-0">
                             #{index + 1}
@@ -906,12 +896,9 @@ const Dashboard = () => {
                         {productTypeIcons[product.type]}
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">
-                          {product.name}
-                        </h3>
+                        <h3 className="font-medium text-gray-900">{product.name}</h3>
                         <p className="text-sm text-gray-500">
-                          ₦{Number(product.price || 0).toLocaleString()} •{" "}
-                          {product.type}
+                          ₦{Number(product.price || 0).toLocaleString()} • {product.type}
                         </p>
                         {product.description && (
                           <p className="text-xs text-gray-400 mt-1 truncate max-w-xs">
@@ -998,215 +985,240 @@ const Dashboard = () => {
       </div>
 
       {showAddProductModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Add Digital Product
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Type
-                </label>
-                <select
-                  value={newProduct.type}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, type: e.target.value })
-                  }
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+        <div className="fixed inset-0 bg-black/50 z-50 p-4 overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center py-6">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Add Digital Product
+                </h3>
+                <button
+                  onClick={() => setShowAddProductModal(false)}
+                  className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                 >
-                  <option value="ebook">E-book / PDF</option>
-                  <option value="course">Online Course</option>
-                  <option value="service">Service / Consulting</option>
-                  <option value="template">Template</option>
-                  <option value="other">Other Digital Product</option>
-                </select>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  value={newProduct.name}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, name: e.target.value })
-                  }
-                  placeholder="e.g. Social Media Marketing Guide"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Product Type
+                  </label>
+                  <select
+                    value={newProduct.type}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, type: e.target.value })
+                    }
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="ebook">E-book / PDF</option>
+                    <option value="course">Online Course</option>
+                    <option value="service">Service / Consulting</option>
+                    <option value="template">Template</option>
+                    <option value="other">Other Digital Product</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Product Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newProduct.name}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, name: e.target.value })
+                    }
+                    placeholder="e.g. Social Media Marketing Guide"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price (₦) *
+                  </label>
+                  <input
+                    type="number"
+                    value={newProduct.price}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, price: e.target.value })
+                    }
+                    placeholder="5000"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    rows="4"
+                    value={newProduct.description}
+                    onChange={(e) =>
+                      setNewProduct({
+                        ...newProduct,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Describe your product..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Product Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setProductImageFile(e.target.files?.[0] || null)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  {productImageFile && (
+                    <p className="text-xs text-gray-500 mt-2 truncate">
+                      Selected: {productImageFile.name}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Link (Paystack/Flutterwave)
+                  </label>
+                  <input
+                    type="url"
+                    value={newProduct.paymentLink}
+                    onChange={(e) =>
+                      setNewProduct({
+                        ...newProduct,
+                        paymentLink: e.target.value,
+                      })
+                    }
+                    placeholder="https://paystack.com/pay/your-payment-link"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Price (₦) *
-                </label>
-                <input
-                  type="number"
-                  value={newProduct.price}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, price: e.target.value })
-                  }
-                  placeholder="5000"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
+              <div className="flex gap-3 p-6 border-t border-gray-200 bg-white flex-shrink-0">
+                <button
+                  onClick={() => setShowAddProductModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddProduct}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Add Product
+                </button>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  rows="3"
-                  value={newProduct.description}
-                  onChange={(e) =>
-                    setNewProduct({
-                      ...newProduct,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Describe your product..."
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Product Image
-  </label>
-  <input
-    type="file"
-    accept="image/*"
-    onChange={(e) => setProductImageFile(e.target.files?.[0] || null)}
-    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-  />
-</div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Link (Paystack/Flutterwave)
-                </label>
-                <input
-                  type="url"
-                  value={newProduct.paymentLink}
-                  onChange={(e) =>
-                    setNewProduct({
-                      ...newProduct,
-                      paymentLink: e.target.value,
-                    })
-                  }
-                  placeholder="https://paystack.com/pay/your-payment-link"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={() => setShowAddProductModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddProduct}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Add Product
-              </button>
             </div>
           </div>
         </div>
       )}
 
       {showAddLinkModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Add New Link
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Link Title *
-                </label>
-                <input
-                  type="text"
-                  value={newLink.title}
-                  onChange={(e) =>
-                    setNewLink({ ...newLink, title: e.target.value })
-                  }
-                  placeholder="e.g. My Instagram"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  URL *
-                </label>
-                <input
-                  type="url"
-                  value={newLink.url}
-                  onChange={(e) =>
-                    setNewLink({ ...newLink, url: e.target.value })
-                  }
-                  placeholder="https://instagram.com/yourusername"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Type
-                </label>
-                <select
-                  value={newLink.type}
-                  onChange={(e) =>
-                    setNewLink({ ...newLink, type: e.target.value })
-                  }
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+        <div className="fixed inset-0 bg-black/50 z-50 p-4 overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center py-6">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Add New Link
+                </h3>
+                <button
+                  onClick={() => setShowAddLinkModal(false)}
+                  className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                 >
-                  <option value="social">Social Media</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="product">Product/Service</option>
-                  <option value="youtube">YouTube</option>
-                  <option value="website">Website</option>
-                </select>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newLink.description}
-                  onChange={(e) =>
-                    setNewLink({ ...newLink, description: e.target.value })
-                  }
-                  placeholder="Brief description"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
-            </div>
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Link Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={newLink.title}
+                    onChange={(e) =>
+                      setNewLink({ ...newLink, title: e.target.value })
+                    }
+                    placeholder="e.g. My Instagram"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
 
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={() => setShowAddLinkModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddLink}
-                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-              >
-                Add Link
-              </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    URL *
+                  </label>
+                  <input
+                    type="url"
+                    value={newLink.url}
+                    onChange={(e) =>
+                      setNewLink({ ...newLink, url: e.target.value })
+                    }
+                    placeholder="https://instagram.com/yourusername"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={newLink.type}
+                    onChange={(e) =>
+                      setNewLink({ ...newLink, type: e.target.value })
+                    }
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option value="social">Social Media</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="product">Product/Service</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="website">Website</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newLink.description}
+                    onChange={(e) =>
+                      setNewLink({ ...newLink, description: e.target.value })
+                    }
+                    placeholder="Brief description"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 p-6 border-t border-gray-200 bg-white flex-shrink-0">
+                <button
+                  onClick={() => setShowAddLinkModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddLink}
+                  className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                >
+                  Add Link
+                </button>
+              </div>
             </div>
           </div>
         </div>
