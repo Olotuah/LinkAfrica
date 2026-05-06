@@ -175,12 +175,20 @@ linkSchema.methods.getWhatsAppUrl = function (message = "") {
 
 // Validate URL format
 linkSchema.pre("save", function (next) {
-  // Basic URL validation
+  // Standard URL validation
   if (
     this.type !== "whatsapp" &&
     this.type !== "email" &&
     this.type !== "phone"
   ) {
+    if (
+      this.url &&
+      !this.url.startsWith("http://") &&
+      !this.url.startsWith("https://")
+    ) {
+      this.url = `https://${this.url}`;
+    }
+
     try {
       new URL(this.url);
     } catch (error) {
@@ -190,11 +198,18 @@ linkSchema.pre("save", function (next) {
 
   // WhatsApp validation
   if (this.type === "whatsapp") {
+    let cleanPhone = this.url
+      .replace("https://wa.me/", "")
+      .replace("http://wa.me/", "")
+      .replace(/[^\d+]/g, "");
+
     const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    const cleanPhone = this.url.replace(/[^\d+]/g, "");
+
     if (!phoneRegex.test(cleanPhone)) {
       return next(new Error("Invalid WhatsApp phone number"));
     }
+
+    this.url = cleanPhone;
   }
 
   next();
